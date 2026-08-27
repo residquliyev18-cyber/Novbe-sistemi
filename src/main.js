@@ -171,8 +171,18 @@ function showLogin() {
           <button type="submit">
             Daxil ol
           </button>
-
+        
+        
+        <button
+          type="button"
+          id="forgotPasswordBtn"
+          class="forgot-password-btn"
+        >
+          Şifrəni unutmusunuz?
+        </button>
+        
         </form>
+       
 
         <div class="divider">
           <span>və ya</span>
@@ -201,6 +211,53 @@ function showLogin() {
       'click',
       showRegister
     )
+    
+  
+  document
+    .querySelector('#forgotPasswordBtn')
+    .addEventListener(
+      'click',
+      async () => {
+        const email =
+          document
+            .querySelector('#loginEmail')
+            .value
+            .trim()
+            .toLowerCase()
+  
+        const message =
+          document
+            .querySelector('#message')
+  
+        if (!email) {
+          message.textContent =
+            'Əvvəlcə e-poçt ünvanınızı daxil edin.'
+          return
+        }
+  
+        const { error } =
+          await supabase
+            .auth
+            .resetPasswordForEmail(
+              email,
+              {
+                redirectTo:
+                  'https://wonderful-panda-c34802.netlify.app'
+              }
+            )
+  
+        if (error) {
+          console.error(error)
+          message.textContent =
+            'Şifrə yeniləmə linki göndərilmədi.'
+          return
+        }
+  
+        message.textContent =
+          'Şifrə yeniləmə linki e-poçtunuza göndərildi.'
+      }
+    )
+  
 
   document
     .querySelector('#loginForm')
@@ -282,7 +339,111 @@ function showLogin() {
       }
     )
 }
+function showResetPassword() {
+  app.innerHTML = `
+    <div class="page">
+      <div class="login-card">
+        <h1>Yeni şifrə</h1>
 
+        <p class="subtitle">
+          Yeni şifrənizi daxil edin
+        </p>
+
+        <form id="resetPasswordForm">
+
+          <label>
+            Yeni şifrə
+
+            <input
+              id="newPassword"
+              type="password"
+              minlength="6"
+              required
+            />
+          </label>
+
+          <label>
+            Yeni şifrəni təkrarla
+
+            <input
+              id="confirmNewPassword"
+              type="password"
+              minlength="6"
+              required
+            />
+          </label>
+
+          <button type="submit">
+            Şifrəni yenilə
+          </button>
+
+        </form>
+
+        <p
+          id="resetMessage"
+          class="message"
+        ></p>
+      </div>
+    </div>
+  `
+
+  document
+    .querySelector('#resetPasswordForm')
+    .addEventListener(
+      'submit',
+      async event => {
+
+        event.preventDefault()
+
+        const password =
+          document
+            .querySelector('#newPassword')
+            .value
+
+        const confirmPassword =
+          document
+            .querySelector('#confirmNewPassword')
+            .value
+
+        const message =
+          document
+            .querySelector('#resetMessage')
+
+        if (password !== confirmPassword) {
+          message.textContent =
+            'Şifrələr eyni deyil.'
+          return
+        }
+
+        if (password.length < 6) {
+          message.textContent =
+            'Şifrə minimum 6 simvol olmalıdır.'
+          return
+        }
+
+        const { error } =
+          await supabase
+            .auth
+            .updateUser({
+              password
+            })
+
+        if (error) {
+          console.error(error)
+          message.textContent =
+            'Şifrə yenilənmədi.'
+          return
+        }
+
+        message.textContent =
+          'Şifrə uğurla yeniləndi.'
+
+        setTimeout(() => {
+          showLogin()
+        }, 1500)
+      }
+    )
+}
 /* =========================
    REGISTER
 ========================= */
@@ -2511,7 +2672,56 @@ const currentUser =
       'currentUser'
     )
   )
-
+  const {
+    data: {
+      session
+    }
+  } =
+    await supabase
+      .auth
+      .getSession()
+  
+  const hash =
+    window.location.hash
+  
+  if (
+    hash.includes(
+      'type=recovery'
+    ) ||
+    session
+  ) {
+    const params =
+      new URLSearchParams(
+        hash.replace(
+          '#',
+          ''
+        )
+      )
+  
+    if (
+      params.get(
+        'type'
+      ) ===
+      'recovery'
+    ) {
+      showResetPassword()
+    } else if (
+      currentUser?.role ===
+      'admin'
+    ) {
+      showAdminDashboard()
+    } else if (
+      currentUser?.role ===
+      'operator'
+    ) {
+      showOperatorDashboard(
+        currentUser
+      )
+    } else {
+      showLogin()
+    }
+  }
+ 
 if (
   currentUser?.role ===
   'admin'
