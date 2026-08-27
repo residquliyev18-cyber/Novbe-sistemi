@@ -629,7 +629,7 @@ function showRegister() {
         const fullName =
   `${name} ${surname}`.trim()
 
-const { error } =
+  const { data, error } =
   await supabase.auth.signUp({
     email,
     password,
@@ -639,6 +639,38 @@ const { error } =
       }
     }
   })
+
+if (error) {
+  console.error(error)
+
+  message.textContent =
+    'Qeydiyyat zamanı xəta baş verdi: ' +
+    error.message
+
+  return
+}
+
+if (data.user) {
+  const { error: profileError } =
+    await supabase
+      .from('profiles')
+      .upsert({
+        id: data.user.id,
+        email,
+        full_name: fullName,
+        role: 'operator',
+        status: 'pending'
+      })
+
+  if (profileError) {
+    console.error(profileError)
+
+    message.textContent =
+      'Hesab yaradıldı, amma profil əlavə olunmadı.'
+
+    return
+  }
+}
 
 if (error) {
   console.error(error)
