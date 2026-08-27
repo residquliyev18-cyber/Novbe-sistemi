@@ -2672,72 +2672,46 @@ const currentUser =
       'currentUser'
     )
   )
-  const {
-    data: {
-      session
-    }
-  } =
-    await supabase
-      .auth
-      .getSession()
-  
-  const hash =
-    window.location.hash
-  
-  if (
-    hash.includes(
-      'type=recovery'
-    ) ||
-    session
-  ) {
-    const params =
-      new URLSearchParams(
-        hash.replace(
-          '#',
-          ''
-        )
-      )
-  
+
+const urlParams =
+  new URLSearchParams(
+    window.location.search
+  )
+
+const hasRecoveryCode =
+  urlParams.has('code')
+
+supabase.auth.onAuthStateChange(
+  (event, session) => {
+
     if (
-      params.get(
-        'type'
-      ) ===
-      'recovery'
+      event ===
+      'PASSWORD_RECOVERY'
     ) {
       showResetPassword()
-    } else if (
-      currentUser?.role ===
-      'admin'
-    ) {
-      showAdminDashboard()
-    } else if (
-      currentUser?.role ===
-      'operator'
-    ) {
-      showOperatorDashboard(
-        currentUser
-      )
-    } else {
-      showLogin()
     }
   }
- 
-if (
-  currentUser?.role ===
-  'admin'
-) {
-  showAdminDashboard()
-}
+)
 
-else if (
-  currentUser?.role ===
-  'operator'
-) {
-  showOperatorDashboard(
-    currentUser
-  )
-}
+if (!hasRecoveryCode) {
 
-else {
-  showLogin()
+  if (
+    currentUser?.role ===
+    'admin'
+  ) {
+    showAdminDashboard()
+  }
+
+  else if (
+    currentUser?.role ===
+    'operator'
+  ) {
+    showOperatorDashboard(
+      currentUser
+    )
+  }
+
+  else {
+    showLogin()
+  }
 }
