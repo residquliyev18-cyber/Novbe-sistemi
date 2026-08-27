@@ -1,5 +1,5 @@
 import './style.css'
-
+import { supabase } from '../supabase.js'
 const app = document.querySelector('#app')
 
 const ADMIN_EMAIL = 'admin@admin.com'
