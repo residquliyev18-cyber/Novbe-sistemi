@@ -472,9 +472,17 @@ function showRegister() {
    ADMIN DASHBOARD
 ========================= */
 
-function showAdminDashboard() {
-  const users =
-    getUsers()
+async function showAdminDashboard() {
+  const { data: users, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error(error)
+    alert('İstifadəçilər yüklənmədi.')
+    return
+  }
 
   const employees =
     getEmployees()
@@ -644,9 +652,30 @@ function showAdminDashboard() {
    USERS
 ========================= */
 
-function showUsersSection() {
-  const users =
-    getUsers()
+async function showUsersSection() {
+  const {
+    data: users,
+    error
+  } =
+    await supabase
+      .from('profiles')
+      .select('*')
+      .order(
+        'created_at',
+        {
+          ascending: false
+        }
+      )
+
+  if (error) {
+    console.error(error)
+
+    alert(
+      'İstifadəçilər yüklənmədi.'
+    )
+
+    return
+  }
 
   const area =
     document.querySelector('#dashboardArea')
@@ -679,10 +708,9 @@ function showUsersSection() {
                   user => `
                     <tr>
 
-                      <td>
-                        ${user.name}
-                        ${user.surname}
-                      </td>
+                    <td>
+                    ${user.full_name || '-'}
+                  </td>
 
                       <td>
                         ${user.email}
@@ -705,7 +733,15 @@ function showUsersSection() {
                       </td>
 
                       <td>
-
+                      <select
+                      class="user-role-select"
+                      data-id="${user.id}"
+                    >
+                      <option value="operator">Operator</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    
+                    
                         <div class="actions">
 
                           <button
@@ -746,42 +782,76 @@ function showUsersSection() {
     </div>
   `
 
-  document
-    .querySelectorAll('.approve-btn')
-    .forEach(button => {
 
-      button.addEventListener(
-        'click',
-        () => {
+document
+document
+  .querySelectorAll('.approve-btn')
+  .forEach(button => {
+    button.addEventListener('click', async () => {
+      const id = button.dataset.id
 
-          updateUserStatus(
-            Number(
-              button.dataset.id
-            ),
-            'approved'
-          )
-        }
-      )
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          status: 'approved'
+        })
+        .eq('id', id)
+
+      if (error) {
+        console.error(error)
+        alert('İstifadəçi təsdiqlənmədi.')
+        return
+      }
+
+      await showUsersSection()
     })
+  })
 
-  document
-    .querySelectorAll('.reject-btn')
-    .forEach(button => {
+document
+  .querySelectorAll('.reject-btn')
+  .forEach(button => {
+    button.addEventListener('click', async () => {
+      const id = button.dataset.id
 
-      button.addEventListener(
-        'click',
-        () => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          status: 'rejected'
+        })
+        .eq('id', id)
 
-          updateUserStatus(
-            Number(
-              button.dataset.id
-            ),
-            'rejected'
-          )
-        }
-      )
+      if (error) {
+        console.error(error)
+        alert('İstifadəçi üçün imtina əməliyyatı alınmadı.')
+        return
+      }
+
+      await showUsersSection()
     })
-}
+  })
+  .querySelectorAll('.user-role-select')
+  .forEach(select => {
+    select.addEventListener('change', async () => {
+      const id = select.dataset.id
+      const role = select.value
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role })
+        .eq('id', id)
+
+      if (error) {
+        console.error(error)
+        alert('Rol dəyişdirilmədi.')
+        return
+      }
+
+      alert('Rol uğurla dəyişdirildi.')
+    })
+  })
+} // <-- showUsersSection bağlanır, bunu saxla
+
+
 
 function updateUserStatus(
   id,
@@ -801,6 +871,7 @@ function updateUserStatus(
   saveUsers(users)
 
   showUsersSection()
+  
 }
 
 /* =========================
