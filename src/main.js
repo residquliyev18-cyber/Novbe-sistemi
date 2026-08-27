@@ -259,11 +259,11 @@ function showLogin() {
     )
   
 
-  document
+    document
     .querySelector('#loginForm')
     .addEventListener(
       'submit',
-      event => {
+      async event => {
 
         event.preventDefault()
 
@@ -302,40 +302,59 @@ function showLogin() {
           return
         }
 
-        const users =
-          getUsers()
-
-        const user =
-          users.find(
-            item =>
-              item.email.toLowerCase() === email &&
-              item.password === password
-          )
-
-        if (!user) {
+        const {
+          data: authData,
+          error: authError
+        } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        })
+        
+        if (authError) {
           message.textContent =
             'E-poçt və ya şifrə yanlışdır.'
           return
         }
-
-        if (user.status === 'pending') {
+        
+        const {
+          data: profile,
+          error: profileError
+        } = await supabase
+      
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .single()
+        
+        if (profileError || !profile) {
           message.textContent =
-            'Hesabınız admin təsdiqini gözləyir.'
+            'Profil məlumatı tapılmadı.'
+          await supabase.auth.signOut()
           return
         }
 
-        if (user.status === 'rejected') {
+        if (profile.status === 'pending') {
+          message.textContent =
+            'Hesabınız admin təsdiqini gözləyir.'
+        
+          await supabase.auth.signOut()
+          return
+        }
+        
+        if (profile.status === 'rejected') {
           message.textContent =
             'Hesabınız rədd edilib.'
+        
+          await supabase.auth.signOut()
           return
         }
 
         localStorage.setItem(
           'currentUser',
-          JSON.stringify(user)
+          JSON.stringify(profile)
         )
 
-        showOperatorDashboard(user)
+        showOperatorDashboard(profile)
       }
     )
 }
@@ -546,7 +565,7 @@ function showRegister() {
     .querySelector('#registerForm')
     .addEventListener(
       'submit',
-      event => {
+      async event => {
 
         event.preventDefault()
 
@@ -607,17 +626,29 @@ function showRegister() {
           return
         }
 
-        users.push({
-          id: Date.now(),
-          name,
-          surname,
-          email,
-          password,
-          role: 'operator',
-          status: 'pending'
-        })
+        const fullName =
+  `${name} ${surname}`.trim()
 
-        saveUsers(users)
+const { error } =
+  await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName
+      }
+    }
+  })
+
+if (error) {
+  console.error(error)
+
+  message.textContent =
+    'Qeydiyyat zamanı xəta baş verdi: ' +
+    error.message
+
+  return
+}
 
         document
           .querySelector('#registerForm')
@@ -898,8 +929,8 @@ async function showUsersSection() {
                       class="user-role-select"
                       data-id="${user.id}"
                     >
-                      <option value="operator">Operator</option>
-                      <option value="admin">Admin</option>
+                    <option value="operator" ${user.role === 'operator' ? 'selected' : ''}>Operator</option>
+                    <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
                     </select>
                     
                     
@@ -990,6 +1021,7 @@ document
       await showUsersSection()
     })
   })
+  document
   .querySelectorAll('.user-role-select')
   .forEach(select => {
     select.addEventListener('change', async () => {
@@ -2666,35 +2698,69 @@ function logout() {
    START
 ========================= */
 
-const currentUser =
-  JSON.parse(
-    localStorage.getItem(
-      'currentUser'
+async function startApp() {
+  const currentUser =
+    JSON.parse(
+      localStorage.getItem(
+        'currentUser'
+      )
     )
-  )
 
-const urlParams =
-  new URLSearchParams(
-    window.location.search
-  )
+  const urlParams =
+    new URLSearchParams(
+      window.location.search
+    )
 
-const hasRecoveryCode =
-  urlParams.has('code')
+  const recoveryCode =
+    urlParams.get('code')
 
-supabase.auth.onAuthStateChange(
-  (event, session) => {
+  // Maildəki recovery linkindən gəlibsə
+  if (recoveryCode) {
+    const {
+      error
+    } =
+      await supabase.auth
+        .exchangeCodeForSession(
+          recoveryCode
+        )
 
-    if (
-      event ===
-      'PASSWORD_RECOVERY'
-    ) {
-      showResetPassword()
+    if (error) {
+      console.error(error)
+
+      showLogin()
+
+      alert(
+        'Şifrə yeniləmə linki etibarsızdır və ya vaxtı bitib.'
+      )
+
+      return
     }
+
+    // URL-dən code hissəsini təmizlə
+    window.history.replaceState(
+      {},
+      document.title,
+      window.location.pathname
+    )
+
+    showResetPassword()
+
+    return
   }
-)
 
-if (!hasRecoveryCode) {
+  // Supabase PASSWORD_RECOVERY event fallback
+  supabase.auth.onAuthStateChange(
+    (event) => {
+      if (
+        event ===
+        'PASSWORD_RECOVERY'
+      ) {
+        showResetPassword()
+      }
+    }
+  )
 
+  // Normal giriş
   if (
     currentUser?.role ===
     'admin'
@@ -2715,3 +2781,5 @@ if (!hasRecoveryCode) {
     showLogin()
   }
 }
+
+startApp()
