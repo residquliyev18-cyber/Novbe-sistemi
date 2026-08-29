@@ -1797,7 +1797,17 @@ function showEmployeesSection() {
 
           genderInput.value =
             employee.gender
-
+            document
+            .querySelectorAll(
+              'input[name="forbiddenShift"]'
+            )
+            .forEach(input => {
+              input.checked =
+                (
+                  employee.forbiddenShifts ||
+                  []
+                ).includes(input.value)
+            })
           saveButton.textContent =
             'Dəyişiklikləri yadda saxla'
 
