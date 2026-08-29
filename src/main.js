@@ -3127,7 +3127,7 @@ async function showStatisticsSection() {
 
             <th>İş günü</th>
 
-            <th>İstirahət günü</th>
+            <th>İstirahət </th>
             <th>Ümumi növbə</th>
 
           </tr>
