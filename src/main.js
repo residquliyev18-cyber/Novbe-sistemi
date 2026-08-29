@@ -1837,55 +1837,19 @@ function createAutomaticSchedule(
     istənilən gününə düşə bilər.
   */
 
-  employees.forEach(
-    (employee, employeeIndex) => {
-
-      for (
-        let restIndex = 0;
-        restIndex < restDayCount;
-        restIndex++
+    employees.forEach(employee => {
+      while (
+        restDays[employee.id].size <
+        restDayCount
       ) {
-
-        let day =
+        const randomDay =
           Math.floor(
-            (
-              restIndex *
-              daysInMonth
-            ) /
-            restDayCount
+            Math.random() * daysInMonth
           )
-
-        day =
-          (
-            day +
-            employeeIndex * 2
-          ) %
-          daysInMonth
-
-        let safety = 0
-
-        while (
-          restDays[
-            employee.id
-          ].has(day) &&
-          safety <
-            daysInMonth
-        ) {
-          day =
-            (
-              day + 1
-            ) %
-            daysInMonth
-
-          safety++
-        }
-
-        restDays[
-          employee.id
-        ].add(day)
+    
+        restDays[employee.id].add(randomDay)
       }
-    }
-  )
+    })
 
   /*
     Gün-gün hər əməkdaşın
