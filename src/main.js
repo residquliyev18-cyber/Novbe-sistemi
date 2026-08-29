@@ -2382,7 +2382,49 @@ function createAutomaticSchedule(
       ][shift] = 0
     })
   })
+  const weeklyRestDays = {}
 
+  employees.forEach(employee => {
+    weeklyRestDays[employee.id] = new Set()
+  
+    for (
+      let weekStart = 0;
+      weekStart < daysInMonth;
+      weekStart += 7
+    ) {
+      const weekDays = []
+  
+      for (
+        let i = 0;
+        i < 7 &&
+        weekStart + i < daysInMonth;
+        i++
+      ) {
+        weekDays.push(weekStart + i)
+      }
+  
+      const shuffledDays =
+        [...weekDays].sort(
+          () => Math.random() - 0.5
+        )
+  
+      const restCount =
+        weekDays.length === 7
+          ? 2
+          : Math.max(
+              0,
+              weekDays.length - 5
+            )
+  
+      shuffledDays
+        .slice(0, restCount)
+        .forEach(dayIndex => {
+          weeklyRestDays[
+            employee.id
+          ].add(dayIndex)
+        })
+    }
+  })
   /*
     Ay üzrə ümumi neçə iş növbəsi
     paylanmalıdır.
@@ -2495,19 +2537,37 @@ function createAutomaticSchedule(
 
     const candidates =
       [...employees]
-        .filter(employee =>
-          workedCount[
+      .filter(employee => {
+        const hasNotReachedTarget =
+          workedCount[employee.id] <
+          (
+            employeeTargets[employee.id] ||
+            targetWorkDays
+          )
+      
+        const isRestDay =
+          weeklyRestDays[
             employee.id
-          ] < targetWorkDays
+          ]?.has(dayIndex)
+      
+        return (
+          hasNotReachedTarget &&
+          !isRestDay
         )
+      })
         .map(employee => ({
           employee,
 
           need:
-            targetWorkDays -
-            workedCount[
+          (
+            employeeTargets[
               employee.id
-            ],
+            ] ||
+            targetWorkDays
+          ) -
+          workedCount[
+            employee.id
+          ],
 
           random:
             Math.random()
@@ -2575,37 +2635,6 @@ function createAutomaticSchedule(
 
     FIXED_SHIFTS.forEach(
       shift => {
-        const eligibleToday =
-  availableToday.filter(employee => {
-
-    const forbiddenShifts =
-      employee.forbiddenShifts ||
-      employee.forbidden_shifts ||
-      employee.blockedShifts ||
-      []
-
-    // Əməkdaş üçün qadağan edilmiş növbədirsə
-    if (forbiddenShifts.includes(shift)) {
-      return false
-    }
-
-    // Qadınlara gecə növbəsi verilməsin
-    if (
-      employee.gender === 'Qadın' &&
-      (
-        shift === '22:00' ||
-        shift === '00:00'
-      )
-    ) {
-      return false
-    }
-
-    return true
-  })
-
-if (!eligibleToday.length) {
-  return
-}
         if (
           !availableToday.length
         ) {
@@ -2777,17 +2806,17 @@ if (!eligibleToday.length) {
           'İstirahət'
       ).length
 
-    if (
-      count !== targetWorkDays
-    ) {
-      console.warn(
-        employee.name,
-        'iş günü:',
-        count,
-        'hədəf:',
-        targetWorkDays
-      )
-    }
+      if (
+        count < targetWorkDays
+      ) {
+        console.warn(
+          employee.name,
+          'normadan az işləyir:',
+          count,
+          'Hədəf:',
+          targetWorkDays
+        )
+      }
   })
 
   return {
@@ -3158,7 +3187,8 @@ async function showStatisticsSection() {
 
             <th>İş günü</th>
 
-            <th>İstirahət </th>
+            <th>İstirahət</th>
+
             <th>Ümumi növbə</th>
 
           </tr>
