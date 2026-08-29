@@ -2891,6 +2891,19 @@ function createAutomaticSchedule(
   }
 
   /*
+    AYLIQ İŞ NORMASINI TAMAMLA
+  */
+  employees.forEach(employee => {
+     // verdiyim tamamlayıcı kod
+  })
+  
+  /*
+    Son yoxlama:
+    hər əməkdaş targetWorkDays
+    qədər işləməlidir.
+  */
+
+  /*
     Son yoxlama:
     hər əməkdaş targetWorkDays
     qədər işləməlidir.
@@ -3714,19 +3727,46 @@ async function showOperatorSchedule() {
                     (_, index) => {
 
                       const shift =
-                        shifts[index] || '-'
-
-                      return `
-                        <td
-                          class="${
-                            shift === 'İstirahət'
-                              ? 'rest-day'
-                              : ''
-                          }"
+                      shifts[index] || 'İstirahət'
+                    
+                    return `
+                      <td
+                        class="${
+                          shift === 'İstirahət'
+                            ? 'rest-day'
+                            : ''
+                        }"
+                      >
+                        <select
+                          class="manual-shift-select"
+                          data-employee-id="${employee.id}"
+                          data-day-index="${index}"
                         >
-                          ${shift}
-                        </td>
-                      `
+                          ${
+                            [
+                              'İstirahət',
+                              '08:00',
+                              '09:00',
+                              '10:00',
+                              '12:00',
+                              '15:00',
+                              '18:00',
+                              '22:00',
+                              '00:00'
+                            ]
+                              .map(option => `
+                                <option
+                                  value="${option}"
+                                  ${option === shift ? 'selected' : ''}
+                                >
+                                  ${option}
+                                </option>
+                              `)
+                              .join('')
+                          }
+                        </select>
+                      </td>
+                    `
                     }
                   ).join('')}
 
@@ -3740,8 +3780,50 @@ async function showOperatorSchedule() {
       </table>
 
     </div>
-  `
+    `
+
+  document
+    .querySelectorAll('.manual-shift-select')
+    .forEach(select => {
+      select.addEventListener(
+        'change',
+        async event => {
+          const employeeId =
+            event.target.dataset.employeeId
+
+          const dayIndex =
+            Number(event.target.dataset.dayIndex)
+
+          const newShift =
+            event.target.value
+
+          schedule.employeeRows[
+            employeeId
+          ][dayIndex] = newShift
+
+          const { error } =
+            await supabase
+              .from('schedules')
+              .update({
+                employee_rows:
+                  schedule.employeeRows
+              })
+              .eq('year', schedule.year)
+              .eq('month', schedule.month)
+
+          if (error) {
+            console.error(error)
+            alert('Növbə yadda saxlanmadı.')
+            return
+          }
+
+          alert('Növbə yadda saxlanıldı.')
+        }
+      )
+    })
+
 }
+
 
 function showOperatorEmployees() {
   const employees =
