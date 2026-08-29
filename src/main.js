@@ -2038,9 +2038,9 @@ async function showScheduleSection() {
       }
     )
 
-  updateWorkDayInfo()
-  loadSelectedSchedule()
-}
+    updateWorkDayInfo()
+    await loadSelectedSchedule()
+    }
 
 /* =========================
    GENERATE
@@ -2072,7 +2072,53 @@ async function generateScheduleFromForm() {
       'Əvvəlcə əməkdaş əlavə edin.'
     return
   }
-
+  async function loadSavedSchedule(
+    year,
+    month
+  ) {
+    const {
+      data,
+      error
+    } = await supabase
+      .from('schedules')
+      .select('*')
+      .eq('year', Number(year))
+      .eq('month', Number(month))
+      .maybeSingle()
+  
+    if (error) {
+      console.error(
+        'Cədvəl yükləmə xətası:',
+        error
+      )
+      return null
+    }
+  
+    if (!data) {
+      return null
+    }
+  
+    return {
+      year: data.year,
+      month: data.month,
+  
+      daysInMonth:
+        new Date(
+          data.year,
+          data.month,
+          0
+        ).getDate(),
+  
+      targetWorkDays:
+        data.target_work_days,
+  
+      employeeRows:
+        data.employee_rows || {},
+  
+      employees:
+        data.employees || []
+    }
+  }
   const schedule =
     createAutomaticSchedule(
       year,
@@ -2141,7 +2187,31 @@ async function generateScheduleFromForm() {
   
     return
   }
-  
+  const savedYear =
+  Number(
+    document.querySelector(
+      '#scheduleYear'
+    ).value
+  )
+
+const savedMonth =
+  Number(
+    document.querySelector(
+      '#scheduleMonth'
+    ).value
+  )
+
+const savedSchedule =
+  await loadSavedSchedule(
+    savedYear,
+    savedMonth
+  )
+
+if (savedSchedule) {
+  renderEmployeeSchedule(
+    savedSchedule
+  )
+}
   message.textContent =
     `Cədvəl yaradıldı. Hər əməkdaş üçün hədəf ${schedule.targetWorkDays} iş günüdür.`
   
@@ -2702,7 +2772,7 @@ function createAutomaticSchedule(
    LOAD SCHEDULE
 ========================= */
 
-function loadSelectedSchedule() {
+async function loadSelectedSchedule() {
   const month =
     Number(
       document
@@ -2717,18 +2787,34 @@ function loadSelectedSchedule() {
         .value
     )
 
-  const schedules =
-    getSchedules()
+  const {
+    data,
+    error
+  } = await supabase
+    .from('schedules')
+    .select('*')
+    .eq('year', year)
+    .eq('month', month)
+    .maybeSingle()
 
-  const schedule =
-    schedules[
-      getScheduleKey(
-        year,
-        month
-      )
-    ]
+  if (error) {
+    console.error(
+      'Cədvəl yüklənmədi:',
+      error
+    )
 
-  if (!schedule) {
+    document
+      .querySelector('#scheduleTableArea')
+      .innerHTML = `
+        <p style="margin-top:25px;">
+          Cədvəl yüklənərkən xəta baş verdi.
+        </p>
+      `
+
+    return
+  }
+
+  if (!data) {
     document
       .querySelector('#scheduleTableArea')
       .innerHTML = `
@@ -2740,11 +2826,27 @@ function loadSelectedSchedule() {
     return
   }
 
-  renderEmployeeSchedule(
-    schedule
-  )
-}
+  const schedule = {
+    year: data.year,
 
+    month: data.month,
+
+    daysInMonth:
+      new Date(
+        data.year,
+        data.month,
+        0
+      ).getDate(),
+
+    targetWorkDays:
+      data.target_work_days,
+
+    employeeRows:
+      data.employee_rows || {}
+  }
+
+  renderEmployeeSchedule(schedule)
+}
 /* =========================
    TABLE
 ========================= */
