@@ -2,9 +2,6 @@ import './style.css'
 import { supabase } from '../supabase.js'
 const app = document.querySelector('#app')
 
-const ADMIN_EMAIL = 'admin@admin.com'
-const ADMIN_PASSWORD = '123456'
-
 const SHIFTS = [
   '08:00',
   '09:00',
@@ -283,25 +280,6 @@ function showLogin() {
           document
             .querySelector('#message')
 
-        if (
-          email === ADMIN_EMAIL &&
-          password === ADMIN_PASSWORD
-        ) {
-
-          localStorage.setItem(
-            'currentUser',
-            JSON.stringify({
-              name: 'Admin',
-              email: ADMIN_EMAIL,
-              role: 'admin'
-            })
-          )
-
-          showAdminDashboard()
-
-          return
-        }
-
         const {
           data: authData,
           error: authError
@@ -348,7 +326,11 @@ function showLogin() {
           JSON.stringify(profile)
         )
 
-        showOperatorDashboard(profile)
+        if (profile.role === 'admin') {
+          await showAdminDashboard()
+        } else {
+          showOperatorDashboard(profile)
+        }
       }
     )
 }
@@ -605,76 +587,47 @@ function showRegister() {
           return
         }
 
-        const users =
-          getUsers()
+        const fullName =
+          `${name} ${surname}`.trim()
 
-        if (
-          users.some(
-            user =>
-              user.email.toLowerCase() === email
-          ) ||
-          email === ADMIN_EMAIL
-        ) {
+        const { data, error } =
+          await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                full_name: fullName
+              }
+            }
+          })
+
+        if (error) {
+          console.error(error)
           message.textContent =
-            'Bu e-poçt artıq istifadə olunur.'
+            'Qeydiyyat zamanı xəta baş verdi: ' +
+            error.message
           return
         }
 
-        const fullName =
-  `${name} ${surname}`.trim()
+        if (data.user) {
+          const { error: profileError } =
+            await supabase
+              .from('profiles')
+              .upsert({
+                id: data.user.id,
+                email,
+                full_name: fullName,
+                role: 'operator',
+                status: 'approved'
+              })
 
-  const { data, error } =
-  await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName
-      }
-    }
-  })
-
-if (error) {
-  console.error(error)
-
-  message.textContent =
-    'Qeydiyyat zamanı xəta baş verdi: ' +
-    error.message
-
-  return
-}
-
-if (data.user) {
-  const { error: profileError } =
-    await supabase
-      .from('profiles')
-      .upsert({
-        id: data.user.id,
-        email,
-        full_name: fullName,
-        role: 'operator',
-        status: 'approved'
-      })
-
-  if (profileError) {
-    console.error(profileError)
-
-    message.textContent =
-      'Hesab yaradıldı, amma profil əlavə olunmadı.'
-
-    return
-  }
-}
-
-if (error) {
-  console.error(error)
-
-  message.textContent =
-    'Qeydiyyat zamanı xəta baş verdi: ' +
-    error.message
-
-  return
-}
+          if (profileError) {
+            console.error(profileError)
+            message.textContent =
+              'Hesab yaradıldı, amma profil əlavə olunmadı.'
+            return
+          }
+        }
 
         document
           .querySelector('#registerForm')
@@ -705,10 +658,10 @@ async function showAdminDashboard() {
   const employees =
     getEmployees()
 
-  const pending =
+  const blocked =
     users.filter(
       user =>
-        user.status === 'pending'
+        user.status === 'rejected'
     ).length
 
   const approved =
@@ -791,13 +744,13 @@ async function showAdminDashboard() {
           </div>
 
           <div class="stat-card">
-            <span>Təsdiqlənib</span>
+            <span>Aktiv istifadəçi</span>
             <strong>${approved}</strong>
           </div>
 
           <div class="stat-card">
-            <span>Təsdiq gözləyir</span>
-            <strong>${pending}</strong>
+            <span>Bloklanıb</span>
+            <strong>${blocked}</strong>
           </div>
 
           <div class="stat-card">
@@ -941,7 +894,7 @@ async function showUsersSection() {
                         >
                           ${
                             user.status === 'approved'
-                              ? 'Təsdiqlənib'
+                              ? 'Aktiv'
                               : user.status === 'rejected'
                               ? 'Rədd edilib'
                               : 'Gözləyir'
@@ -966,14 +919,14 @@ async function showUsersSection() {
                             class="approve-btn"
                             data-id="${user.id}"
                           >
-                            Təsdiq et
+                            Aktiv et
                           </button>
 
                           <button
                             class="reject-btn"
                             data-id="${user.id}"
                           >
-                            Rədd et
+                            Blokla
                           </button>
 
                         </div>
@@ -1002,7 +955,6 @@ async function showUsersSection() {
 
 
 document
-document
   .querySelectorAll('.approve-btn')
   .forEach(button => {
     button.addEventListener('click', async () => {
@@ -1017,7 +969,7 @@ document
 
       if (error) {
         console.error(error)
-        alert('İstifadəçi təsdiqlənmədi.')
+        alert('İstifadəçi aktiv edilmədi.')
         return
       }
 
@@ -1040,7 +992,7 @@ document
 
       if (error) {
         console.error(error)
-        alert('İstifadəçi üçün imtina əməliyyatı alınmadı.')
+        alert('İstifadəçini bloklamaq mümkün olmadı.')
         return
       }
 
@@ -1071,27 +1023,6 @@ document
 } // <-- showUsersSection bağlanır, bunu saxla
 
 
-
-function updateUserStatus(
-  id,
-  status
-) {
-  const users =
-    getUsers().map(
-      user =>
-        user.id === id
-          ? {
-              ...user,
-              status
-            }
-          : user
-    )
-
-  saveUsers(users)
-
-  showUsersSection()
-  
-}
 
 /* =========================
    EMPLOYEES
@@ -2425,11 +2356,11 @@ function showOperatorDashboard(user) {
         </button>
 
         <button
-          class="menu-btn"
-          id="operatorStatisticsBtn"
-        >
-          Statistika
-        </button>
+        class="menu-btn"
+        id="operatorProfileBtn"
+      >
+        Profil
+      </button>
 
         <button
           class="menu-btn logout"
@@ -2447,11 +2378,11 @@ function showOperatorDashboard(user) {
           <div>
             <h1>
               Xoş gəldiniz,
-              ${user.name}
+              ${user.full_name || user.name || 'İstifadəçi'}
             </h1>
 
             <p>
-              Operator paneli
+              İşçi paneli
             </p>
           </div>
 
@@ -2505,11 +2436,134 @@ function showOperatorDashboard(user) {
     )
 
   document
-    .querySelector('#operatorStatisticsBtn')
-    .addEventListener(
-      'click',
-      showOperatorStatistics
-    )
+    .querySelector('#operatorProfileBtn')
+    .addEventListener('click', () => {
+  
+      document.querySelector('#operatorArea').innerHTML = `
+        <h2>Profilim</h2>
+  
+        <div class="profile-info">
+  
+          <label>Ad Soyad</label>
+          <input
+            type="text"
+            id="profileFullName"
+            value="${user.full_name || user.name || ''}"
+          >
+  
+          <label>E-poçt</label>
+          <input
+            type="email"
+            id="profileEmail"
+            value="${user.email || ''}"
+            disabled
+          >
+  
+          <label>Telefon nömrəsi</label>
+          <input
+            type="text"
+            id="profilePhone"
+            value="${user.phone || ''}"
+            placeholder="+994..."
+          >
+  
+          <button id="saveProfileBtn">
+            Yadda saxla
+          </button>
+  
+          <hr>
+  
+          <h3>Şifrəni dəyiş</h3>
+  
+          <input
+            type="password"
+            id="newPassword"
+            placeholder="Yeni şifrə"
+          >
+  
+          <button id="changePasswordBtn">
+            Şifrəni dəyiş
+          </button>
+  
+          <p id="profileMessage"></p>
+  
+        </div>
+      `
+  
+      document
+        .querySelector('#saveProfileBtn')
+        .addEventListener('click', async () => {
+  
+          const fullName =
+            document.querySelector('#profileFullName').value.trim()
+  
+          const phone =
+            document.querySelector('#profilePhone').value.trim()
+  
+          const message =
+            document.querySelector('#profileMessage')
+  
+          const { error } = await supabase
+            .from('profiles')
+            .update({
+              full_name: fullName,
+              phone: phone
+            })
+            .eq('id', user.id)
+  
+          if (error) {
+            console.error(error)
+            message.textContent =
+              'Məlumatları yadda saxlamaq mümkün olmadı.'
+            return
+          }
+  
+          user.full_name = fullName
+          user.phone = phone
+
+          localStorage.setItem(
+            'currentUser',
+            JSON.stringify(user)
+          )
+
+          message.textContent =
+            'Profil məlumatları yadda saxlanıldı.'
+        })
+  
+      document
+        .querySelector('#changePasswordBtn')
+        .addEventListener('click', async () => {
+  
+          const password =
+            document.querySelector('#newPassword').value
+  
+          const message =
+            document.querySelector('#profileMessage')
+  
+          if (password.length < 6) {
+            message.textContent =
+              'Şifrə minimum 6 simvol olmalıdır.'
+            return
+          }
+  
+          const { error } = await supabase.auth.updateUser({
+            password: password
+          })
+  
+          if (error) {
+            console.error(error)
+            message.textContent =
+              'Şifrəni dəyişmək mümkün olmadı.'
+            return
+          }
+  
+          document.querySelector('#newPassword').value = ''
+  
+          message.textContent =
+            'Şifrə uğurla dəyişdirildi.'
+        })
+    })
+ 
 
   document
     .querySelector('#logoutBtn')
@@ -2712,11 +2766,9 @@ function showOperatorStatistics() {
    LOGOUT
 ========================= */
 
-function logout() {
-  localStorage.removeItem(
-    'currentUser'
-  )
-
+async function logout() {
+  await supabase.auth.signOut()
+  localStorage.removeItem('currentUser')
   showLogin()
 }
 
@@ -2725,44 +2777,23 @@ function logout() {
 ========================= */
 
 async function startApp() {
-  const currentUser =
-    JSON.parse(
-      localStorage.getItem(
-        'currentUser'
-      )
-    )
-
   const urlParams =
-    new URLSearchParams(
-      window.location.search
-    )
+    new URLSearchParams(window.location.search)
 
   const recoveryCode =
     urlParams.get('code')
 
-  // Maildəki recovery linkindən gəlibsə
   if (recoveryCode) {
-    const {
-      error
-    } =
-      await supabase.auth
-        .exchangeCodeForSession(
-          recoveryCode
-        )
+    const { error } =
+      await supabase.auth.exchangeCodeForSession(recoveryCode)
 
     if (error) {
       console.error(error)
-
       showLogin()
-
-      alert(
-        'Şifrə yeniləmə linki etibarsızdır və ya vaxtı bitib.'
-      )
-
+      alert('Şifrə yeniləmə linki etibarsızdır və ya vaxtı bitib.')
       return
     }
 
-    // URL-dən code hissəsini təmizlə
     window.history.replaceState(
       {},
       document.title,
@@ -2770,42 +2801,57 @@ async function startApp() {
     )
 
     showResetPassword()
-
     return
   }
 
-  // Supabase PASSWORD_RECOVERY event fallback
-  supabase.auth.onAuthStateChange(
-    (event) => {
-      if (
-        event ===
-        'PASSWORD_RECOVERY'
-      ) {
-        showResetPassword()
-      }
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      showResetPassword()
     }
+  })
+
+  const { data: sessionData } =
+    await supabase.auth.getSession()
+
+  const session = sessionData?.session
+
+  if (!session?.user) {
+    localStorage.removeItem('currentUser')
+    showLogin()
+    return
+  }
+
+  const { data: profile, error } =
+    await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single()
+
+  if (error || !profile) {
+    console.error(error)
+    await supabase.auth.signOut()
+    localStorage.removeItem('currentUser')
+    showLogin()
+    return
+  }
+
+  if (profile.status === 'rejected') {
+    await supabase.auth.signOut()
+    localStorage.removeItem('currentUser')
+    showLogin()
+    return
+  }
+
+  localStorage.setItem(
+    'currentUser',
+    JSON.stringify(profile)
   )
 
-  // Normal giriş
-  if (
-    currentUser?.role ===
-    'admin'
-  ) {
-    showAdminDashboard()
-  }
-
-  else if (
-    currentUser?.role ===
-    'operator'
-  ) {
-    showOperatorDashboard(
-      currentUser
-    )
-  }
-
-  else {
-    showLogin()
+  if (profile.role === 'admin') {
+    await showAdminDashboard()
+  } else {
+    showOperatorDashboard(profile)
   }
 }
 
-startApp()
