@@ -2662,10 +2662,24 @@ function createAutomaticSchedule(
             targetWorkDays
           )
       
+          const remainingNeed =
+          (
+            employeeTargets[employee.id] ||
+            targetWorkDays
+          ) -
+          workedCount[employee.id]
+        
+        const remainingCalendarDays =
+          daysInMonth - dayIndex
+        
+        const mustWorkToday =
+          remainingNeed >= remainingCalendarDays
+        
         const isRestDay =
           weeklyRestDays[
             employee.id
-          ]?.has(dayIndex)
+          ]?.has(dayIndex) &&
+          !mustWorkToday
       
         return (
           hasNotReachedTarget &&
