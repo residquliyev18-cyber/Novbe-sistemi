@@ -1838,17 +1838,38 @@ function createAutomaticSchedule(
   */
 
     employees.forEach(employee => {
-      while (
-        restDays[employee.id].size <
-        restDayCount
+      const availableDays =
+        Array.from(
+          { length: daysInMonth },
+          (_, index) => index
+        )
+    
+      // Günləri hər dəfə təsadüfi qarışdır
+      for (
+        let i = availableDays.length - 1;
+        i > 0;
+        i--
       ) {
-        const randomDay =
+        const j =
           Math.floor(
-            Math.random() * daysInMonth
+            Math.random() * (i + 1)
           )
     
-        restDays[employee.id].add(randomDay)
+        ;[
+          availableDays[i],
+          availableDays[j]
+        ] = [
+          availableDays[j],
+          availableDays[i]
+        ]
       }
+    
+      // Qarışdırılmış günlərdən istirahət günlərini seç
+      availableDays
+        .slice(0, restDayCount)
+        .forEach(day => {
+          restDays[employee.id].add(day)
+        })
     })
 
   /*
