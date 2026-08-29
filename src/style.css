@@ -757,3 +757,33 @@ th.weekend-day {
     font-size: 23px;
   }
 }
+/* Növbənin üzərinə kliklə manual dəyişmə */
+.shift-edit-btn {
+  width: auto;
+  min-width: 60px;
+  padding: 6px 8px;
+  margin: 0;
+  background: transparent;
+  color: #1f2937;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.shift-edit-btn:hover {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+  transform: none;
+}
+
+.manual-shift-select {
+  width: 85px;
+  min-width: 85px;
+  padding: 6px;
+  margin: 0;
+  font-size: 12px;
+  cursor: pointer;
+}
