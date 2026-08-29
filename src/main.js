@@ -1531,7 +1531,22 @@ function showEmployeesSection() {
           </select>
 
         </label>
-
+        <div class="forbidden-shifts-field">
+        <label>Qadağan olunmuş növbələr</label>
+      
+        <div class="forbidden-shifts-list">
+          ${SHIFTS.map(shift => `
+            <label class="forbidden-shift-option">
+              <input
+                type="checkbox"
+                name="forbiddenShift"
+                value="${shift}"
+              >
+              <span>${shift}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
       </div>
 
       <div
@@ -1681,7 +1696,12 @@ function showEmployeesSection() {
 
       const gender =
         genderInput.value
-
+        const forbiddenShifts =
+        Array.from(
+          document.querySelectorAll(
+            'input[name="forbiddenShift"]:checked'
+          )
+        ).map(input => input.value)
       const editingId =
         Number(
           editingInput.value
@@ -1700,10 +1720,12 @@ function showEmployeesSection() {
                     ...employee,
                     name,
                     surname,
-                    gender
+                    gender,
+                    forbiddenShifts
                   }
                 : employee
           )
+        
 
         saveEmployees(employees)
 
@@ -3658,6 +3680,7 @@ function showOperatorEmployees() {
               <th>№</th>
               <th>Ad Soyad</th>
               <th>Cins</th>
+              <th>Qadağan olunmuş növbələr</th>
             </tr>
 
           </thead>
@@ -3680,7 +3703,13 @@ function showOperatorEmployees() {
                   <td>
                     ${employee.gender}
                   </td>
-
+                  <td>
+                  ${
+                    employee.forbiddenShifts?.length
+                      ? employee.forbiddenShifts.join(', ')
+                      : 'Yoxdur'
+                  }
+                </td>
                 </tr>
               `
             ).join('')}
