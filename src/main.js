@@ -811,52 +811,352 @@ async function showAdminDashboard() {
             <p>Sistemə ümumi baxış</p>
           </div>
 
-          <div class="admin-name">
-            Admin
-          </div>
+          <div class="admin-datetime">
+          <div>Admin</div>
+        
+          <div id="adminDate"></div>
+        
+          <div id="adminClock"></div>
+        </div>
 
         </div>
 
-        <div class="stats-grid">
+        <div class="admin-overview-grid">
 
-          <div class="stat-card">
-            <span>Ümumi istifadəçi</span>
+        <div class="overview-card blue">
+          <div class="overview-icon">👥</div>
+          <div>
+            <span>Ümumi istifadəçilər</span>
             <strong>${users.length}</strong>
+            <small>Sistemdə qeydiyyatdan keçən istifadəçi sayı</small>
           </div>
-
-          <div class="stat-card">
-            <span>Təsdiqlənib</span>
-            <strong>${approved}</strong>
-          </div>
-
-          <div class="stat-card">
-            <span>Təsdiq gözləyir</span>
-            <strong>${pending}</strong>
-          </div>
-
-          <div class="stat-card">
-            <span>Əməkdaş sayı</span>
+        </div>
+      
+        <div class="overview-card green">
+          <div class="overview-icon">🧑‍💼</div>
+          <div>
+            <span>Əməkdaşlar</span>
             <strong>${employees.length}</strong>
+            <small>Sistemdə olan ümumi əməkdaş sayı</small>
           </div>
-
         </div>
-
-        <div
-          id="dashboardArea"
-          class="content-card"
-        >
-          <h2>İdarəetmə paneli</h2>
-
-          <p>
-            Sol menyudan bölmə seçin.
-          </p>
+      
+        <div class="overview-card purple">
+          <div class="overview-icon">📅</div>
+          <div>
+            <span>Bugünkü növbədə</span>
+            <strong id="todayShiftCount">0</strong>
+            <small>Bu gün növbəsi olan əməkdaş sayı</small>
+          </div>
         </div>
+      
+        <div class="overview-card orange">
+          <div class="overview-icon">🕒</div>
+          <div>
+            <span>Hazırda növbədə</span>
+            <strong id="activeShiftCount">0</strong>
+            <small>Hazırda növbəsi başlamış əməkdaş sayı</small>
+          </div>
+        </div>
+      
+      </div>
+      
+      <div class="dashboard-detail-grid">
+      
+        <div class="dashboard-big-card">
+      
+          <h2>Bugünkü növbə vəziyyəti</h2>
+          <p id="todayScheduleDate"></p>
+      
+          <div class="today-shift-stats">
+      
+            <div class="today-stat">
+              <span>Hazırda növbədə</span>
+              <strong id="activeShiftDetail">0</strong>
+              <small>Növbəsi başlamış əməkdaş sayı</small>
+            </div>
+      
+            <div class="today-stat">
+              <span>Gözlənilir</span>
+              <strong id="waitingShiftCount">0</strong>
+              <small>Növbəsi başlayacaq əməkdaş sayı</small>
+            </div>
+      
+            <div class="today-stat">
+              <span>Bugünkü ümumi növbə</span>
+              <strong id="todayShiftDetail">0</strong>
+              <small>Bu gün növbəsi olan əməkdaş sayı</small>
+            </div>
+      
+          </div>
+      
+          <div class="shift-progress">
+            <div
+              id="activeProgress"
+              class="shift-progress-active"
+            ></div>
+          </div>
+      
+        </div>
+      
+        <div class="dashboard-big-card">
+      
+          <h2>Cari günün xülasəsi</h2>
+      
+          <div class="summary-row">
+            <span>Bugünkü tarix</span>
+            <strong id="summaryTodayDate">-</strong>
+          </div>
+      
+          <div class="summary-row">
+            <span>Bugünkü növbədə olan əməkdaşlar</span>
+            <strong id="summaryTodayShift">0</strong>
+          </div>
+      
+          <div class="summary-row">
+            <span>Hazırda növbədə olanlar</span>
+            <strong id="summaryActiveShift">0</strong>
+          </div>
+      
+          <div class="summary-row">
+            <span>Növbəsi başlayacaq əməkdaşlar</span>
+            <strong id="summaryWaitingShift">0</strong>
+          </div>
+      
+        </div>
+      
+      </div>
+      
+      <div
+        id="dashboardArea"
+        class="content-card"
+      >
+        <h2>İdarəetmə paneli</h2>
+        <p>Sol menyudan bölmə seçin.</p>
+      </div>
 
       </main>
 
     </div>
   `
-
+  async function updateTodayShiftDashboard() {
+    const now = new Date()
+  
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    const day = now.getDate()
+  
+    const currentMinutes =
+      now.getHours() * 60 +
+      now.getMinutes()
+  
+    const {
+      data: scheduleData,
+      error
+    } = await supabase
+      .from('schedules')
+      .select('*')
+      .eq('year', year)
+      .eq('month', month)
+      .maybeSingle()
+  
+    if (error) {
+      console.error(error)
+      return
+    }
+  
+    let todayCount = 0
+    let activeCount = 0
+    let waitingCount = 0
+  
+    if (scheduleData) {
+      const scheduleEmployees =
+        scheduleData.employees || []
+  
+      const rows =
+        scheduleData.employee_rows || {}
+  
+      scheduleEmployees.forEach(employee => {
+        const shifts =
+          rows[employee.id] || []
+  
+        const shift =
+          shifts[day - 1]
+  
+          if (
+            !shift ||
+            shift.trim().toLowerCase() === 'istirahət'
+          ) {
+            return
+          }
+          
+          todayCount++
+  
+        const [hour, minute] =
+          shift.split(':').map(Number)
+  
+        const startMinutes =
+          hour * 60 + (minute || 0)
+  
+          const SHIFT_END_MINUTES = {
+            '08:00': 17 * 60,
+            '09:00': 18 * 60,
+            '10:00': 19 * 60,
+            '12:00': 21 * 60,
+            '15:00': 24 * 60,
+            '18:00': 26 * 60,
+            '22:00': 30 * 60,
+            '00:00': 32 * 60
+          }
+          
+          let adjustedCurrentMinutes =
+            currentMinutes
+          
+          if (
+            shift === '18:00' &&
+            now.getHours() < 2
+          ) {
+            adjustedCurrentMinutes += 24 * 60
+          }
+          
+          if (
+            shift === '22:00' &&
+            now.getHours() < 6
+          ) {
+            adjustedCurrentMinutes += 24 * 60
+          }
+          
+          if (
+            shift === '00:00' &&
+            now.getHours() < 8
+          ) {
+            adjustedCurrentMinutes += 24 * 60
+          }
+          
+          const endMinutes =
+            SHIFT_END_MINUTES[shift]
+          
+          if (
+            adjustedCurrentMinutes >= startMinutes &&
+            adjustedCurrentMinutes < endMinutes
+          ) {
+            activeCount++
+          } else if (
+            adjustedCurrentMinutes < startMinutes
+          ) {
+            waitingCount++
+          }
+      })
+    }
+  
+    const formattedDate =
+      `${String(day).padStart(2, '0')}.` +
+      `${String(month).padStart(2, '0')}.` +
+      `${year}`
+  
+    document.querySelector(
+      '#todayShiftCount'
+    ).textContent = todayCount
+  
+    document.querySelector(
+      '#activeShiftCount'
+    ).textContent = activeCount
+  
+    document.querySelector(
+      '#activeShiftDetail'
+    ).textContent = activeCount
+  
+    document.querySelector(
+      '#waitingShiftCount'
+    ).textContent = waitingCount
+  
+    document.querySelector(
+      '#todayShiftDetail'
+    ).textContent = todayCount
+  
+    document.querySelector(
+      '#todayScheduleDate'
+    ).textContent =
+      `${formattedDate} tarixinə olan məlumat`
+  
+    document.querySelector(
+      '#summaryTodayDate'
+    ).textContent = formattedDate
+  
+    document.querySelector(
+      '#summaryTodayShift'
+    ).textContent = todayCount
+  
+    document.querySelector(
+      '#summaryActiveShift'
+    ).textContent = activeCount
+  
+    document.querySelector(
+      '#summaryWaitingShift'
+    ).textContent = waitingCount
+  
+    const percent =
+      todayCount > 0
+        ? Math.round(
+            activeCount / todayCount * 100
+          )
+        : 0
+  
+    document.querySelector(
+      '#activeProgress'
+    ).style.width = `${percent}%`
+  }
+  
+  updateTodayShiftDashboard()
+  
+  setInterval(
+    updateTodayShiftDashboard,
+    60000
+  )
+  function updateAdminDateTime() {
+    const now = new Date()
+  
+    const day =
+    String(now.getDate()).padStart(2, '0')
+  
+  const month =
+    String(now.getMonth() + 1).padStart(2, '0')
+  
+  const year =
+    now.getFullYear()
+  
+  const date =
+    `${day}.${month}.${year}`
+  
+    const time =
+      now.toLocaleTimeString(
+        'az-AZ',
+        {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }
+      )
+  
+    const dateElement =
+      document.querySelector('#adminDate')
+  
+    const clockElement =
+      document.querySelector('#adminClock')
+  
+    if (dateElement) {
+      dateElement.textContent = date
+    }
+  
+    if (clockElement) {
+      clockElement.textContent = time
+    }
+  }
+  
+  updateAdminDateTime()
+  
+  setInterval(updateAdminDateTime, 1000)
   document
     .querySelector('#dashboardBtn')
     .addEventListener(
