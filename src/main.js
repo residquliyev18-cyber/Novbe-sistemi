@@ -1609,9 +1609,17 @@ function showEmployeesSection() {
                       </td>
 
                       <td>
-                        ${employee.name}
-                        ${employee.surname}
-                      </td>
+                      ${employee.name}
+                      ${employee.surname}
+                    
+                      ${
+                        employee.forbiddenShifts?.length
+                          ? `<span class="forbidden-shifts-text">
+                              — Qadağan: ${employee.forbiddenShifts.join(', ')}
+                            </span>`
+                          : ''
+                      }
+                    </td>
 
                       <td>
                         ${employee.gender}
@@ -3627,12 +3635,20 @@ async function showOperatorSchedule() {
               return `
                 <tr>
 
-                  <td class="employee-name-column">
-                    <strong>
-                      ${employee.name}
-                      ${employee.surname}
-                    </strong>
-                  </td>
+                <td class="employee-name-column">
+                <strong>
+                  ${employee.name}
+                  ${employee.surname}
+                </strong>
+              
+                ${
+                  employee.forbiddenShifts?.length
+                    ? `<span class="forbidden-shifts-text">
+                        Qadağan: ${employee.forbiddenShifts.join(', ')}
+                      </span>`
+                    : ''
+                }
+              </td>
 
                   ${days.map(
                     (_, index) => {
@@ -3690,7 +3706,6 @@ function showOperatorEmployees() {
               <th>№</th>
               <th>Ad Soyad</th>
               <th>Cins</th>
-              <th>Qadağan olunmuş növbələr</th>
             </tr>
 
           </thead>
@@ -3706,20 +3721,22 @@ function showOperatorEmployees() {
                   </td>
 
                   <td>
-                    ${employee.name}
-                    ${employee.surname}
-                  </td>
+                  ${employee.name}
+                  ${employee.surname}
+                
+                  ${
+                    employee.forbiddenShifts?.length
+                      ? `<span class="forbidden-shifts-text">
+                          — Qadağan: ${employee.forbiddenShifts.join(', ')}
+                        </span>`
+                      : ''
+                  }
+                </td>
 
                   <td>
                     ${employee.gender}
                   </td>
-                  <td>
-                  ${
-                    employee.forbiddenShifts?.length
-                      ? employee.forbiddenShifts.join(', ')
-                      : 'Yoxdur'
-                  }
-                </td>
+                 
                 </tr>
               `
             ).join('')}
