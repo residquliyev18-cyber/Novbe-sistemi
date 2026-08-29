@@ -3743,6 +3743,7 @@ async function showOperatorSchedule() {
                           data-employee-id="${employee.id}"
                           data-day-index="${index}"
                           data-current-shift="${shift}"
+                          onclick="window.editScheduleShift(this)"
                         >
                           ${shift}
                         </button>
@@ -3763,7 +3764,7 @@ async function showOperatorSchedule() {
     </div>
     `
 
-    area.onclick = async event => {
+    area.onclick = event => {
       const button =
         event.target.closest('.shift-edit-btn')
     
@@ -3780,11 +3781,15 @@ async function showOperatorSchedule() {
       const currentShift =
         button.dataset.currentShift
     
-      const select =
-        document.createElement('select')
+      document
+        .querySelectorAll('.shift-dropdown')
+        .forEach(menu => menu.remove())
     
-      select.className =
-        'manual-shift-select'
+      const dropdown =
+        document.createElement('div')
+    
+      dropdown.className =
+        'shift-dropdown'
     
       const options = [
         'İstirahət',
@@ -3798,66 +3803,70 @@ async function showOperatorSchedule() {
         '00:00'
       ]
     
-      select.innerHTML =
-        options
-          .map(option => `
-            <option
-              value="${option}"
-              ${
-                option === currentShift
-                  ? 'selected'
-                  : ''
-              }
-            >
-              ${option}
-            </option>
-          `)
-          .join('')
+      options.forEach(option => {
+        const optionButton =
+          document.createElement('button')
     
-      button.replaceWith(select)
+        optionButton.type = 'button'
     
-      select.focus()
+        optionButton.className =
+          'shift-dropdown-option'
     
-      select.addEventListener(
-        'change',
-        async () => {
-          const newShift =
-            select.value
+        if (option === currentShift) {
+          optionButton.classList.add('current')
+        }
     
-          schedule.employeeRows[
-            employeeId
-          ][dayIndex] = newShift
+        optionButton.textContent = option
     
-          const { error } =
-            await supabase
-              .from('schedules')
-              .update({
-                employee_rows:
-                  schedule.employeeRows
-              })
-              .eq(
-                'year',
-                schedule.year
-              )
-              .eq(
-                'month',
-                schedule.month
-              )
+        optionButton.addEventListener(
+          'click',
+          async optionEvent => {
+            optionEvent.stopPropagation()
     
-          if (error) {
-            console.error(error)
+            const oldShift =
+              schedule.employeeRows[
+                employeeId
+              ][dayIndex]
     
-            alert(
-              'Növbəni yadda saxlamaq mümkün olmadı.'
-            )
+            schedule.employeeRows[
+              employeeId
+            ][dayIndex] = option
+    
+            const { error } =
+              await supabase
+                .from('schedules')
+                .update({
+                  employee_rows:
+                    schedule.employeeRows
+                })
+                .eq('year', schedule.year)
+                .eq('month', schedule.month)
+    
+            if (error) {
+              console.error(error)
+    
+              schedule.employeeRows[
+                employeeId
+              ][dayIndex] = oldShift
+    
+              alert('Növbə yadda saxlanmadı.')
+              return
+            }
+    
+            dropdown.remove()
     
             renderEmployeeSchedule(schedule)
-            return
           }
+        )
     
-          renderEmployeeSchedule(schedule)
-        }
-      )
+        dropdown.appendChild(optionButton)
+      })
+    
+      const cell =
+        button.closest('td')
+    
+      cell.style.position = 'relative'
+      cell.appendChild(dropdown)
     }
 }
 

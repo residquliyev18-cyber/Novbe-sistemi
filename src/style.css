@@ -787,3 +787,39 @@ th.weekend-day {
   font-size: 12px;
   cursor: pointer;
 }
+.shift-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 110px;
+  padding: 6px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.15);
+  z-index: 9999;
+}
+
+.shift-dropdown-option {
+  width: 100%;
+  padding: 8px 10px;
+  margin: 2px 0;
+  background: white;
+  color: #1f2937;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.shift-dropdown-option:hover {
+  background: #eff6ff;
+  color: #2563eb;
+  transform: none;
+}
+
+.shift-dropdown-option.current {
+  background: #2563eb;
+  color: white;
+}
