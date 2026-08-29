@@ -283,24 +283,58 @@ function showLogin() {
           document
             .querySelector('#message')
 
-        if (
-          email === ADMIN_EMAIL &&
-          password === ADMIN_PASSWORD
-        ) {
-
-          localStorage.setItem(
-            'currentUser',
-            JSON.stringify({
-              name: 'Admin',
-              email: ADMIN_EMAIL,
-              role: 'admin'
-            })
-          )
-
-          showAdminDashboard()
-
-          return
-        }
+            if (
+              email === ADMIN_EMAIL &&
+              password === ADMIN_PASSWORD
+            ) {
+              const {
+                data: adminAuth,
+                error: adminAuthError
+              } = await supabase.auth.signInWithPassword({
+                email,
+                password
+              })
+            
+              if (adminAuthError) {
+                console.error(adminAuthError)
+                message.textContent =
+                  'Admin hesabına giriş mümkün olmadı.'
+                return
+              }
+            
+              const {
+                data: adminProfile,
+                error: adminProfileError
+              } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', adminAuth.user.id)
+                .single()
+            
+              if (
+                adminProfileError ||
+                !adminProfile ||
+                adminProfile.role !== 'admin'
+              ) {
+                console.error(adminProfileError)
+            
+                await supabase.auth.signOut()
+            
+                message.textContent =
+                  'Bu hesabın admin səlahiyyəti yoxdur.'
+            
+                return
+              }
+            
+              localStorage.setItem(
+                'currentUser',
+                JSON.stringify(adminProfile)
+              )
+            
+              await showAdminDashboard()
+            
+              return
+            }
 
         const {
           data: authData,
@@ -1676,7 +1710,7 @@ function showScheduleSection() {
    GENERATE
 ========================= */
 
-function generateScheduleFromForm() {
+async function generateScheduleFromForm() {
   const month =
     Number(
       document
@@ -1710,21 +1744,33 @@ function generateScheduleFromForm() {
       employees
     )
 
-  const schedules =
-    getSchedules()
-
-  schedules[
-    getScheduleKey(
-      year,
-      month
+    const { error } = await supabase
+    .from('schedules')
+    .upsert(
+      {
+        year: year,
+        month: month,
+        target_work_days: schedule.targetWorkDays,
+        employee_rows: schedule.employeeRows,
+        employees: employees
+      },
+      {
+        onConflict: 'year,month'
+      }
     )
-  ] = schedule
-
-  saveSchedules(schedules)
-
+  
+  if (error) {
+    console.error(error)
+  
+    message.textContent =
+      'Cədvəli Supabase-də yadda saxlamaq mümkün olmadı.'
+  
+    return
+  }
+  
   message.textContent =
     `Cədvəl yaradıldı. Hər əməkdaş üçün hədəf ${schedule.targetWorkDays} iş günüdür.`
-
+  
   renderEmployeeSchedule(
     schedule
   )
@@ -2636,21 +2682,34 @@ function showOperatorDashboard(user) {
     )
 }
 
-function showOperatorSchedule() {
-  const schedules =
-    getSchedules()
-
-  const keys =
-    Object.keys(
-      schedules
-    )
-      .sort()
-      .reverse()
-
+async function showOperatorSchedule() {
   const area =
     document.querySelector('#operatorArea')
 
-  if (!keys.length) {
+  area.innerHTML = `
+    <h2>Növbə cədvəli</h2>
+    <p>Cədvəl yüklənir...</p>
+  `
+
+  const { data: schedules, error } =
+    await supabase
+      .from('schedules')
+      .select('*')
+      .order('year', { ascending: false })
+      .order('month', { ascending: false })
+      .limit(1)
+
+  if (error) {
+    console.error(error)
+
+    area.innerHTML = `
+      <h2>Növbə cədvəli</h2>
+      <p>Cədvəli yükləmək mümkün olmadı.</p>
+    `
+    return
+  }
+
+  if (!schedules || !schedules.length) {
     area.innerHTML = `
       <h2>Növbə cədvəli</h2>
       <p>Hələ cədvəl yaradılmayıb.</p>
@@ -2658,27 +2717,33 @@ function showOperatorSchedule() {
     return
   }
 
-  const schedule =
-    schedules[keys[0]]
+  const savedSchedule = schedules[0]
 
   const employees =
-    getEmployees()
+    savedSchedule.employees || []
+
+  const employeeRows =
+    savedSchedule.employee_rows || {}
+
+  const daysInMonth =
+    new Date(
+      savedSchedule.year,
+      savedSchedule.month,
+      0
+    ).getDate()
 
   const days =
     Array.from(
-      {
-        length:
-          schedule.daysInMonth
-      },
-      (_, index) =>
-        index + 1
+      { length: daysInMonth },
+      (_, index) => index + 1
     )
 
   area.innerHTML = `
     <h2>Növbə cədvəli</h2>
 
     <p>
-      Bu bölmə yalnız baxış üçündür.
+      ${String(savedSchedule.month).padStart(2, '0')}.${savedSchedule.year}
+      — yalnız baxış üçündür.
     </p>
 
     <div class="table-wrapper">
@@ -2686,7 +2751,6 @@ function showOperatorSchedule() {
       <table class="employee-schedule-table">
 
         <thead>
-
           <tr>
 
             <th class="employee-name-column">
@@ -2696,13 +2760,12 @@ function showOperatorSchedule() {
             ${days.map(
               day => `
                 <th>
-                  ${String(day).padStart(2, '0')}.${String(schedule.month).padStart(2, '0')}
+                  ${String(day).padStart(2, '0')}.${String(savedSchedule.month).padStart(2, '0')}
                 </th>
               `
             ).join('')}
 
           </tr>
-
         </thead>
 
         <tbody>
@@ -2711,35 +2774,36 @@ function showOperatorSchedule() {
             employee => {
 
               const shifts =
-                schedule
-                  .employeeRows?.[
-                    employee.id
-                  ] || []
+                employeeRows?.[employee.id] || []
 
               return `
                 <tr>
 
                   <td class="employee-name-column">
-
                     <strong>
                       ${employee.name}
                       ${employee.surname}
                     </strong>
-
                   </td>
 
-                  ${shifts.map(
-                    shift => `
-                      <td
-                        class="${
-                          shift === 'İstirahət'
-                            ? 'rest-day'
-                            : ''
-                        }"
-                      >
-                        ${shift}
-                      </td>
-                    `
+                  ${days.map(
+                    (_, index) => {
+
+                      const shift =
+                        shifts[index] || '-'
+
+                      return `
+                        <td
+                          class="${
+                            shift === 'İstirahət'
+                              ? 'rest-day'
+                              : ''
+                          }"
+                        >
+                          ${shift}
+                        </td>
+                      `
+                    }
                   ).join('')}
 
                 </tr>
