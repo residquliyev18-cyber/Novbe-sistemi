@@ -2575,6 +2575,37 @@ function createAutomaticSchedule(
 
     FIXED_SHIFTS.forEach(
       shift => {
+        const eligibleToday =
+  availableToday.filter(employee => {
+
+    const forbiddenShifts =
+      employee.forbiddenShifts ||
+      employee.forbidden_shifts ||
+      employee.blockedShifts ||
+      []
+
+    // Əməkdaş üçün qadağan edilmiş növbədirsə
+    if (forbiddenShifts.includes(shift)) {
+      return false
+    }
+
+    // Qadınlara gecə növbəsi verilməsin
+    if (
+      employee.gender === 'Qadın' &&
+      (
+        shift === '22:00' ||
+        shift === '00:00'
+      )
+    ) {
+      return false
+    }
+
+    return true
+  })
+
+if (!eligibleToday.length) {
+  return
+}
         if (
           !availableToday.length
         ) {
