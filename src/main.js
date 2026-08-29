@@ -2560,43 +2560,12 @@ function createAutomaticSchedule(
       minimumAssignments
     )
   
-  const employeeTargets = {}
-  
-  const extraAssignments =
-    totalAssignments -
-    baseAssignments
-  
-  const baseExtra =
-    Math.floor(
-      extraAssignments /
-      employees.length
-    )
-  
-  let extraRemainder =
-    extraAssignments %
-    employees.length
-  
-  const randomizedEmployees =
-    [...employees].sort(
-      () => Math.random() - 0.5
-    )
-  
-  randomizedEmployees.forEach(
-    employee => {
+    const employeeTargets = {}
+
+    employees.forEach(employee => {
       employeeTargets[employee.id] =
-        targetWorkDays +
-        baseExtra +
-        (
-          extraRemainder > 0
-            ? 1
-            : 0
-        )
-  
-      if (extraRemainder > 0) {
-        extraRemainder--
-      }
-    }
-  )
+        targetWorkDays
+    })
 
   /*
     Hər gün neçə nəfər işləyəcək.
