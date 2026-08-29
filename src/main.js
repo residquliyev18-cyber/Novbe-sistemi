@@ -3024,11 +3024,8 @@ async function loadSelectedSchedule() {
    TABLE
 ========================= */
 
-function renderEmployeeSchedule(
-  schedule
-) {
-  const employees =
-    getEmployees()
+function renderEmployeeSchedule(schedule) {
+  const employees = getEmployees()
 
   const area =
     document.querySelector('#scheduleTableArea')
@@ -3036,11 +3033,9 @@ function renderEmployeeSchedule(
   const days =
     Array.from(
       {
-        length:
-          schedule.daysInMonth
+        length: schedule.daysInMonth
       },
-      (_, index) =>
-        index + 1
+      (_, index) => index + 1
     )
 
   area.innerHTML = `
@@ -3055,21 +3050,14 @@ function renderEmployeeSchedule(
       ${schedule.targetWorkDays || '-'}
     </div>
 
-    <div
-      class="table-wrapper"
-    >
+    <div class="table-wrapper">
 
-      <table
-        class="employee-schedule-table"
-      >
+      <table class="employee-schedule-table">
 
         <thead>
-
           <tr>
 
-            <th
-              class="employee-name-column"
-            >
+            <th class="employee-name-column">
               Əməkdaş
             </th>
 
@@ -3079,15 +3067,17 @@ function renderEmployeeSchedule(
                 schedule.month - 1,
                 day
               )
-            
+
               const weekDay = date.getDay()
-            
+
               const isWeekend =
-                weekDay === 0 || weekDay === 6
-            
+                weekDay === 0 ||
+                weekDay === 6
+
               const isWeekStart =
-                weekDay === 1 && day !== 1
-            
+                weekDay === 1 &&
+                day !== 1
+
               return `
                 <th class="
                   ${isWeekend ? 'weekend-day' : ''}
@@ -3099,50 +3089,59 @@ function renderEmployeeSchedule(
             }).join('')}
 
           </tr>
-
         </thead>
 
         <tbody>
 
-          ${employees.map(
-            employee => {
+          ${employees.map(employee => {
 
-              const shifts =
-                schedule
-                  .employeeRows?.[
-                    employee.id
-                  ] || []
+            const shifts =
+              schedule.employeeRows?.[
+                employee.id
+              ] || []
 
-              return `
-                <tr>
+            return `
+              <tr>
 
-                  <td
-                    class="employee-name-column"
-                  >
-                    <strong>
-                      ${employee.name}
-                      ${employee.surname}
-                    </strong>
-                  </td>
+                <td class="employee-name-column">
+                  <strong>
+                    ${employee.name}
+                    ${employee.surname}
+                  </strong>
+                </td>
 
-                  ${shifts.map(
-                    shift => `
-                      <td
-                        class="${
-                          shift === 'İstirahət'
-                            ? 'rest-day'
-                            : ''
-                        }"
+                ${days.map((_, index) => {
+
+                  const shift =
+                    shifts[index] ||
+                    'İstirahət'
+
+                  return `
+                    <td
+                      class="${
+                        shift === 'İstirahət'
+                          ? 'rest-day'
+                          : ''
+                      }"
+                    >
+
+                      <button
+                        type="button"
+                        class="shift-edit-btn"
+                        data-employee-id="${employee.id}"
+                        data-day-index="${index}"
+                        data-current-shift="${shift}"
                       >
                         ${shift}
-                      </td>
-                    `
-                  ).join('')}
+                      </button>
 
-                </tr>
-              `
-            }
-          ).join('')}
+                    </td>
+                  `
+                }).join('')}
+
+              </tr>
+            `
+          }).join('')}
 
         </tbody>
 
@@ -3150,6 +3149,149 @@ function renderEmployeeSchedule(
 
     </div>
   `
+
+  area.onclick = event => {
+
+    const button =
+      event.target.closest(
+        '.shift-edit-btn'
+      )
+
+    if (!button) {
+      return
+    }
+
+    const employeeId =
+      button.dataset.employeeId
+
+    const dayIndex =
+      Number(
+        button.dataset.dayIndex
+      )
+
+    const currentShift =
+      button.dataset.currentShift
+
+    document
+      .querySelectorAll(
+        '.shift-dropdown'
+      )
+      .forEach(
+        menu => menu.remove()
+      )
+
+    const dropdown =
+      document.createElement('div')
+
+    dropdown.className =
+      'shift-dropdown'
+
+    const options = [
+      'İstirahət',
+      '08:00',
+      '09:00',
+      '10:00',
+      '12:00',
+      '15:00',
+      '18:00',
+      '22:00',
+      '00:00'
+    ]
+
+    options.forEach(option => {
+
+      const optionButton =
+        document.createElement(
+          'button'
+        )
+
+      optionButton.type =
+        'button'
+
+      optionButton.className =
+        'shift-dropdown-option'
+
+      if (
+        option === currentShift
+      ) {
+        optionButton
+          .classList
+          .add('current')
+      }
+
+      optionButton.textContent =
+        option
+
+      optionButton.addEventListener(
+        'click',
+        async optionEvent => {
+
+          optionEvent.stopPropagation()
+
+          const oldShift =
+            schedule.employeeRows[
+              employeeId
+            ][dayIndex]
+
+          schedule.employeeRows[
+            employeeId
+          ][dayIndex] = option
+
+          const { error } =
+            await supabase
+              .from('schedules')
+              .update({
+                employee_rows:
+                  schedule.employeeRows
+              })
+              .eq(
+                'year',
+                schedule.year
+              )
+              .eq(
+                'month',
+                schedule.month
+              )
+
+          if (error) {
+
+            console.error(error)
+
+            schedule.employeeRows[
+              employeeId
+            ][dayIndex] =
+              oldShift
+
+            alert(
+              'Növbə yadda saxlanmadı.'
+            )
+
+            return
+          }
+
+          dropdown.remove()
+
+          renderEmployeeSchedule(
+            schedule
+          )
+        }
+      )
+
+      dropdown.appendChild(
+        optionButton
+      )
+    })
+
+    const cell =
+      button.closest('td')
+
+    cell.style.position =
+      'relative'
+
+    cell.appendChild(
+      dropdown
+    )
+  }
 }
 
 /* =========================
@@ -3743,7 +3885,7 @@ async function showOperatorSchedule() {
                           data-employee-id="${employee.id}"
                           data-day-index="${index}"
                           data-current-shift="${shift}"
-                          onclick="window.editScheduleShift(this)"
+                          
                         >
                           ${shift}
                         </button>
@@ -3764,117 +3906,14 @@ async function showOperatorSchedule() {
     </div>
     `
 
-    area.onclick = event => {
-      const button =
-        event.target.closest('.shift-edit-btn')
     
-      if (!button) {
-        return
-      }
-    
-      const employeeId =
-        button.dataset.employeeId
-    
-      const dayIndex =
-        Number(button.dataset.dayIndex)
-    
-      const currentShift =
-        button.dataset.currentShift
-    
-      document
-        .querySelectorAll('.shift-dropdown')
-        .forEach(menu => menu.remove())
-    
-      const dropdown =
-        document.createElement('div')
-    
-      dropdown.className =
-        'shift-dropdown'
-    
-      const options = [
-        'İstirahət',
-        '08:00',
-        '09:00',
-        '10:00',
-        '12:00',
-        '15:00',
-        '18:00',
-        '22:00',
-        '00:00'
-      ]
-    
-      options.forEach(option => {
-        const optionButton =
-          document.createElement('button')
-    
-        optionButton.type = 'button'
-    
-        optionButton.className =
-          'shift-dropdown-option'
-    
-        if (option === currentShift) {
-          optionButton.classList.add('current')
-        }
-    
-        optionButton.textContent = option
-    
-        optionButton.addEventListener(
-          'click',
-          async optionEvent => {
-            optionEvent.stopPropagation()
-    
-            const oldShift =
-              schedule.employeeRows[
-                employeeId
-              ][dayIndex]
-    
-            schedule.employeeRows[
-              employeeId
-            ][dayIndex] = option
-    
-            const { error } =
-              await supabase
-                .from('schedules')
-                .update({
-                  employee_rows:
-                    schedule.employeeRows
-                })
-                .eq('year', schedule.year)
-                .eq('month', schedule.month)
-    
-            if (error) {
-              console.error(error)
-    
-              schedule.employeeRows[
-                employeeId
-              ][dayIndex] = oldShift
-    
-              alert('Növbə yadda saxlanmadı.')
-              return
-            }
-    
-            dropdown.remove()
-    
-            renderEmployeeSchedule(schedule)
-          }
-        )
-    
-        dropdown.appendChild(optionButton)
-      })
-    
-      const cell =
-        button.closest('td')
-    
-      cell.style.position = 'relative'
-      cell.appendChild(dropdown)
-    }
 }
 
 
 function showOperatorEmployees() {
   const employees =
     getEmployees()
-
+    window.currentAdminSchedule = schedule
   document
     .querySelector('#operatorArea')
     .innerHTML = `
