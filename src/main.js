@@ -1625,10 +1625,17 @@ function showScheduleSection() {
       </label>
 
       <button
-        id="generateScheduleBtn"
-      >
-        Avtomatik yarat
-      </button>
+      id="generateScheduleBtn"
+    >
+      Avtomatik yarat
+    </button>
+    
+    <button
+      id="recoverScheduleBtn"
+      type="button"
+    >
+      Recover
+    </button>
 
     </div>
 
@@ -1681,7 +1688,12 @@ function showScheduleSection() {
       'click',
       generateScheduleFromForm
     )
-
+    document
+    .querySelector('#recoverScheduleBtn')
+    .addEventListener(
+      'click',
+      recoverPreviousSchedule
+    )
   document
     .querySelector('#scheduleMonth')
     .addEventListener(
@@ -1744,20 +1756,58 @@ async function generateScheduleFromForm() {
       employees
     )
 
+    const {
+      data: existingSchedule,
+      error: existingError
+    } = await supabase
+      .from('schedules')
+      .select(`
+        employee_rows,
+        employees,
+        target_work_days
+      `)
+      .eq('year', year)
+      .eq('month', month)
+      .maybeSingle()
+    
+    if (existingError) {
+      console.error(existingError)
+    
+      message.textContent =
+        'Əvvəlki cədvəl yoxlanılmadı.'
+    
+      return
+    }
+    
     const { error } = await supabase
-    .from('schedules')
-    .upsert(
-      {
-        year: year,
-        month: month,
-        target_work_days: schedule.targetWorkDays,
-        employee_rows: schedule.employeeRows,
-        employees: employees
-      },
-      {
-        onConflict: 'year,month'
-      }
-    )
+      .from('schedules')
+      .upsert(
+        {
+          year: year,
+          month: month,
+    
+          target_work_days:
+            schedule.targetWorkDays,
+    
+          employee_rows:
+            schedule.employeeRows,
+    
+          employees:
+            employees,
+    
+          previous_employee_rows:
+            existingSchedule?.employee_rows || null,
+    
+          previous_employees:
+            existingSchedule?.employees || null,
+    
+          previous_target_work_days:
+            existingSchedule?.target_work_days || null
+        },
+        {
+          onConflict: 'year,month'
+        }
+      )
   
   if (error) {
     console.error(error)
@@ -1775,7 +1825,102 @@ async function generateScheduleFromForm() {
     schedule
   )
 }
+/* =========================
+   AVTOMATİK NÖVBƏ
+========================= */
 
+async function recoverPreviousSchedule() {
+  const month =
+    Number(
+      document
+        .querySelector('#scheduleMonth')
+        .value
+    )
+
+  const year =
+    Number(
+      document
+        .querySelector('#scheduleYear')
+        .value
+    )
+
+  const { data, error } =
+    await supabase
+      .from('schedules')
+      .select('*')
+      .eq('year', year)
+      .eq('month', month)
+      .maybeSingle()
+
+  if (error) {
+    console.error(error)
+    alert('Cədvəl yüklənmədi.')
+    return
+  }
+
+  if (!data?.previous_employee_rows) {
+    alert('Geri qaytarılacaq əvvəlki cədvəl yoxdur.')
+    return
+  }
+
+  const {
+    data: recovered,
+    error: recoverError
+  } = await supabase
+    .from('schedules')
+    .update({
+      employee_rows:
+        data.previous_employee_rows,
+
+      employees:
+        data.previous_employees ||
+        data.employees,
+
+      target_work_days:
+        data.previous_target_work_days ||
+        data.target_work_days,
+
+      previous_employee_rows:
+        data.employee_rows,
+
+      previous_employees:
+        data.employees,
+
+      previous_target_work_days:
+        data.target_work_days
+    })
+    .eq('id', data.id)
+    .select()
+    .single()
+
+  if (recoverError) {
+    console.error(recoverError)
+    alert('Əvvəlki cədvəl bərpa edilmədi.')
+    return
+  }
+
+  const schedule = {
+    year: recovered.year,
+    month: recovered.month,
+
+    daysInMonth:
+      new Date(
+        recovered.year,
+        recovered.month,
+        0
+      ).getDate(),
+
+    targetWorkDays:
+      recovered.target_work_days,
+
+    employeeRows:
+      recovered.employee_rows
+  }
+
+  renderEmployeeSchedule(schedule)
+
+  alert('Əvvəlki cədvəl bərpa edildi.')
+}
 /* =========================
    AVTOMATİK NÖVBƏ
 ========================= */
