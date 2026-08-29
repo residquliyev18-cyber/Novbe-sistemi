@@ -2315,13 +2315,30 @@ function renderEmployeeSchedule(
               Əməkdaş
             </th>
 
-            ${days.map(
-              day => `
-                <th>
+            ${days.map(day => {
+              const date = new Date(
+                schedule.year,
+                schedule.month - 1,
+                day
+              )
+            
+              const weekDay = date.getDay()
+            
+              const isWeekend =
+                weekDay === 0 || weekDay === 6
+            
+              const isWeekStart =
+                weekDay === 1 && day !== 1
+            
+              return `
+                <th class="
+                  ${isWeekend ? 'weekend-day' : ''}
+                  ${isWeekStart ? 'week-start' : ''}
+                ">
                   ${String(day).padStart(2, '0')}.${String(schedule.month).padStart(2, '0')}
                 </th>
               `
-            ).join('')}
+            }).join('')}
 
           </tr>
 
