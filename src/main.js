@@ -2,6 +2,9 @@ import './style.css'
 import { supabase } from '../supabase.js'
 const app = document.querySelector('#app')
 
+const ADMIN_EMAIL = 'admin@admin.com'
+const ADMIN_PASSWORD = '123456'
+
 const SHIFTS = [
   '08:00',
   '09:00',
@@ -280,6 +283,25 @@ function showLogin() {
           document
             .querySelector('#message')
 
+        if (
+          email === ADMIN_EMAIL &&
+          password === ADMIN_PASSWORD
+        ) {
+
+          localStorage.setItem(
+            'currentUser',
+            JSON.stringify({
+              name: 'Admin',
+              email: ADMIN_EMAIL,
+              role: 'admin'
+            })
+          )
+
+          showAdminDashboard()
+
+          return
+        }
+
         const {
           data: authData,
           error: authError
@@ -326,11 +348,7 @@ function showLogin() {
           JSON.stringify(profile)
         )
 
-        if (profile.role === 'admin') {
-          await showAdminDashboard()
-        } else {
-          showOperatorDashboard(profile)
-        }
+        showOperatorDashboard(profile)
       }
     )
 }
@@ -587,47 +605,76 @@ function showRegister() {
           return
         }
 
-        const fullName =
-          `${name} ${surname}`.trim()
+        const users =
+          getUsers()
 
-        const { data, error } =
-          await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                full_name: fullName
-              }
-            }
-          })
-
-        if (error) {
-          console.error(error)
+        if (
+          users.some(
+            user =>
+              user.email.toLowerCase() === email
+          ) ||
+          email === ADMIN_EMAIL
+        ) {
           message.textContent =
-            'Qeydiyyat zamanı xəta baş verdi: ' +
-            error.message
+            'Bu e-poçt artıq istifadə olunur.'
           return
         }
 
-        if (data.user) {
-          const { error: profileError } =
-            await supabase
-              .from('profiles')
-              .upsert({
-                id: data.user.id,
-                email,
-                full_name: fullName,
-                role: 'operator',
-                status: 'approved'
-              })
+        const fullName =
+  `${name} ${surname}`.trim()
 
-          if (profileError) {
-            console.error(profileError)
-            message.textContent =
-              'Hesab yaradıldı, amma profil əlavə olunmadı.'
-            return
-          }
-        }
+  const { data, error } =
+  await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName
+      }
+    }
+  })
+
+if (error) {
+  console.error(error)
+
+  message.textContent =
+    'Qeydiyyat zamanı xəta baş verdi: ' +
+    error.message
+
+  return
+}
+
+if (data.user) {
+  const { error: profileError } =
+    await supabase
+      .from('profiles')
+      .upsert({
+        id: data.user.id,
+        email,
+        full_name: fullName,
+        role: 'operator',
+        status: 'approved'
+      })
+
+  if (profileError) {
+    console.error(profileError)
+
+    message.textContent =
+      'Hesab yaradıldı, amma profil əlavə olunmadı.'
+
+    return
+  }
+}
+
+if (error) {
+  console.error(error)
+
+  message.textContent =
+    'Qeydiyyat zamanı xəta baş verdi: ' +
+    error.message
+
+  return
+}
 
         document
           .querySelector('#registerForm')
@@ -658,10 +705,10 @@ async function showAdminDashboard() {
   const employees =
     getEmployees()
 
-  const blocked =
+  const pending =
     users.filter(
       user =>
-        user.status === 'rejected'
+        user.status === 'pending'
     ).length
 
   const approved =
@@ -744,13 +791,13 @@ async function showAdminDashboard() {
           </div>
 
           <div class="stat-card">
-            <span>Aktiv istifadəçi</span>
+            <span>Təsdiqlənib</span>
             <strong>${approved}</strong>
           </div>
 
           <div class="stat-card">
-            <span>Bloklanıb</span>
-            <strong>${blocked}</strong>
+            <span>Təsdiq gözləyir</span>
+            <strong>${pending}</strong>
           </div>
 
           <div class="stat-card">
@@ -894,7 +941,7 @@ async function showUsersSection() {
                         >
                           ${
                             user.status === 'approved'
-                              ? 'Aktiv'
+                              ? 'Təsdiqlənib'
                               : user.status === 'rejected'
                               ? 'Rədd edilib'
                               : 'Gözləyir'
@@ -919,14 +966,14 @@ async function showUsersSection() {
                             class="approve-btn"
                             data-id="${user.id}"
                           >
-                            Aktiv et
+                            Təsdiq et
                           </button>
 
                           <button
                             class="reject-btn"
                             data-id="${user.id}"
                           >
-                            Blokla
+                            Rədd et
                           </button>
 
                         </div>
@@ -955,6 +1002,7 @@ async function showUsersSection() {
 
 
 document
+document
   .querySelectorAll('.approve-btn')
   .forEach(button => {
     button.addEventListener('click', async () => {
@@ -969,7 +1017,7 @@ document
 
       if (error) {
         console.error(error)
-        alert('İstifadəçi aktiv edilmədi.')
+        alert('İstifadəçi təsdiqlənmədi.')
         return
       }
 
@@ -992,7 +1040,7 @@ document
 
       if (error) {
         console.error(error)
-        alert('İstifadəçini bloklamaq mümkün olmadı.')
+        alert('İstifadəçi üçün imtina əməliyyatı alınmadı.')
         return
       }
 
@@ -1023,6 +1071,27 @@ document
 } // <-- showUsersSection bağlanır, bunu saxla
 
 
+
+function updateUserStatus(
+  id,
+  status
+) {
+  const users =
+    getUsers().map(
+      user =>
+        user.id === id
+          ? {
+              ...user,
+              status
+            }
+          : user
+    )
+
+  saveUsers(users)
+
+  showUsersSection()
+  
+}
 
 /* =========================
    EMPLOYEES
@@ -2378,11 +2447,11 @@ function showOperatorDashboard(user) {
           <div>
             <h1>
               Xoş gəldiniz,
-              ${user.full_name || user.name || 'İstifadəçi'}
+              ${user.name}
             </h1>
 
             <p>
-              İşçi paneli
+              Operator paneli
             </p>
           </div>
 
@@ -2434,8 +2503,7 @@ function showOperatorDashboard(user) {
       'click',
       showOperatorEmployees
     )
-
-  document
+    document
     .querySelector('#operatorProfileBtn')
     .addEventListener('click', () => {
   
@@ -2520,12 +2588,7 @@ function showOperatorDashboard(user) {
   
           user.full_name = fullName
           user.phone = phone
-
-          localStorage.setItem(
-            'currentUser',
-            JSON.stringify(user)
-          )
-
+  
           message.textContent =
             'Profil məlumatları yadda saxlanıldı.'
         })
@@ -2766,9 +2829,11 @@ function showOperatorStatistics() {
    LOGOUT
 ========================= */
 
-async function logout() {
-  await supabase.auth.signOut()
-  localStorage.removeItem('currentUser')
+function logout() {
+  localStorage.removeItem(
+    'currentUser'
+  )
+
   showLogin()
 }
 
@@ -2777,23 +2842,44 @@ async function logout() {
 ========================= */
 
 async function startApp() {
+  const currentUser =
+    JSON.parse(
+      localStorage.getItem(
+        'currentUser'
+      )
+    )
+
   const urlParams =
-    new URLSearchParams(window.location.search)
+    new URLSearchParams(
+      window.location.search
+    )
 
   const recoveryCode =
     urlParams.get('code')
 
+  // Maildəki recovery linkindən gəlibsə
   if (recoveryCode) {
-    const { error } =
-      await supabase.auth.exchangeCodeForSession(recoveryCode)
+    const {
+      error
+    } =
+      await supabase.auth
+        .exchangeCodeForSession(
+          recoveryCode
+        )
 
     if (error) {
       console.error(error)
+
       showLogin()
-      alert('Şifrə yeniləmə linki etibarsızdır və ya vaxtı bitib.')
+
+      alert(
+        'Şifrə yeniləmə linki etibarsızdır və ya vaxtı bitib.'
+      )
+
       return
     }
 
+    // URL-dən code hissəsini təmizlə
     window.history.replaceState(
       {},
       document.title,
@@ -2801,57 +2887,42 @@ async function startApp() {
     )
 
     showResetPassword()
+
     return
   }
 
-  supabase.auth.onAuthStateChange((event) => {
-    if (event === 'PASSWORD_RECOVERY') {
-      showResetPassword()
+  // Supabase PASSWORD_RECOVERY event fallback
+  supabase.auth.onAuthStateChange(
+    (event) => {
+      if (
+        event ===
+        'PASSWORD_RECOVERY'
+      ) {
+        showResetPassword()
+      }
     }
-  })
-
-  const { data: sessionData } =
-    await supabase.auth.getSession()
-
-  const session = sessionData?.session
-
-  if (!session?.user) {
-    localStorage.removeItem('currentUser')
-    showLogin()
-    return
-  }
-
-  const { data: profile, error } =
-    await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single()
-
-  if (error || !profile) {
-    console.error(error)
-    await supabase.auth.signOut()
-    localStorage.removeItem('currentUser')
-    showLogin()
-    return
-  }
-
-  if (profile.status === 'rejected') {
-    await supabase.auth.signOut()
-    localStorage.removeItem('currentUser')
-    showLogin()
-    return
-  }
-
-  localStorage.setItem(
-    'currentUser',
-    JSON.stringify(profile)
   )
 
-  if (profile.role === 'admin') {
-    await showAdminDashboard()
-  } else {
-    showOperatorDashboard(profile)
+  // Normal giriş
+  if (
+    currentUser?.role ===
+    'admin'
+  ) {
+    showAdminDashboard()
+  }
+
+  else if (
+    currentUser?.role ===
+    'operator'
+  ) {
+    showOperatorDashboard(
+      currentUser
+    )
+  }
+
+  else {
+    showLogin()
   }
 }
 
+startApp()
