@@ -2028,13 +2028,11 @@ function createAutomaticSchedule(
               minimum + 1
           )
 
-        const selectedShift =
+          const selectedShift =
           balanced[
-            (
-              employeeIndex +
-              day
-            ) %
-            balanced.length
+            Math.floor(
+              Math.random() * balanced.length
+            )
           ]
 
         rows[
