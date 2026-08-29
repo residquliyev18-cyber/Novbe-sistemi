@@ -2903,26 +2903,42 @@ async function startApp() {
     }
   )
 
-  // Normal giriş
-  if (
-    currentUser?.role ===
-    'admin'
-  ) {
-    showAdminDashboard()
-  }
-
-  else if (
-    currentUser?.role ===
-    'operator'
-  ) {
-    showOperatorDashboard(
-      currentUser
-    )
-  }
-
-  else {
+  const {
+    data: { session }
+  } = await supabase.auth.getSession()
+  
+  if (!session?.user) {
+    localStorage.removeItem('currentUser')
     showLogin()
+    return
   }
-}
+  
+  const { data: profile, error: profileError } =
+    await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single()
+  
+  if (profileError || !profile) {
+    console.error(profileError)
+    await supabase.auth.signOut()
+    localStorage.removeItem('currentUser')
+    showLogin()
+    return
+  }
+  
+  localStorage.setItem(
+    'currentUser',
+    JSON.stringify(profile)
+  )
+  
+  if (profile.role === 'admin') {
+    await showAdminDashboard()
+  } else {
+    showOperatorDashboard(profile)
+  }
+  }
+
 
 startApp()
