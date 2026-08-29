@@ -1872,7 +1872,7 @@ function showEmployeesSection() {
    SCHEDULE SCREEN
 ========================= */
 
-function showScheduleSection() {
+async function showScheduleSection() {
   const area =
     document.querySelector('#dashboardArea')
 
