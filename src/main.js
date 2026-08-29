@@ -333,13 +333,7 @@ function showLogin() {
           return
         }
 
-        if (profile.status === 'pending') {
-          message.textContent =
-            'Hesabınız admin təsdiqini gözləyir.'
-        
-          await supabase.auth.signOut()
-          return
-        }
+
         
         if (profile.status === 'rejected') {
           message.textContent =
@@ -659,7 +653,7 @@ if (data.user) {
         email,
         full_name: fullName,
         role: 'operator',
-        status: 'pending'
+        status: 'approved'
       })
 
   if (profileError) {
@@ -686,8 +680,8 @@ if (error) {
           .querySelector('#registerForm')
           .reset()
 
-        message.textContent =
-          'Qeydiyyat uğurludur. Admin təsdiq etdikdən sonra giriş edə bilərsiniz.'
+          message.textContent =
+          'Qeydiyyat uğurludur. İndi hesabınıza daxil ola bilərsiniz.'
       }
     )
 }
