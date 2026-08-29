@@ -760,7 +760,7 @@ async function showAdminDashboard() {
 
         <button
           id="dashboardBtn"
-          class="menu-btn active"
+          class="menu-btn"
         >
           Dashboard
         </button>
@@ -939,6 +939,23 @@ async function showAdminDashboard() {
 
     </div>
   `
+  function activateAdminMenu(buttonId) {
+    const buttons =
+      document.querySelectorAll(
+        '.sidebar .menu-btn'
+      )
+  
+    buttons.forEach(button => {
+      button.classList.remove('active')
+    })
+  
+    const selected =
+      document.getElementById(buttonId)
+  
+    if (selected) {
+      selected.classList.add('active')
+    }
+  }
   async function updateTodayShiftDashboard() {
     const now = new Date()
   
@@ -995,8 +1012,12 @@ async function showAdminDashboard() {
         const [hour, minute] =
           shift.split(':').map(Number)
   
-        const startMinutes =
-          hour * 60 + (minute || 0)
+   let startMinutes =
+  hour * 60 + (minute || 0)
+
+if (shift === '00:00') {
+  startMinutes = 24 * 60
+}
   
           const SHIFT_END_MINUTES = {
             '08:00': 17 * 60,
@@ -1164,11 +1185,14 @@ async function showAdminDashboard() {
       showAdminDashboard
     )
 
-  document
+    document
     .querySelector('#usersBtn')
     .addEventListener(
       'click',
-      showUsersSection
+      () => {
+        activateAdminMenu('usersBtn')
+        showUsersSection()
+      }
     )
 
   document
@@ -2857,181 +2881,207 @@ function renderEmployeeSchedule(
    STATISTICS
 ========================= */
 
-function showStatisticsSection() {
-  const employees =
-    getEmployees()
-
-  const schedules =
-    getSchedules()
-
-  const counts = {}
-
-  employees.forEach(
-    employee => {
-
-      counts[
-        employee.id
-      ] = {
-        work: 0,
-        rest: 0,
-        shifts: {}
-      }
-
-      SHIFTS.forEach(
-        shift => {
-          counts[
-            employee.id
-          ].shifts[
-            shift
-          ] = 0
-        }
-      )
-    }
-  )
-
-  Object.values(
-    schedules
-  ).forEach(
-    schedule => {
-
-      employees.forEach(
-        employee => {
-
-          const shifts =
-            schedule
-              .employeeRows?.[
-                employee.id
-              ] || []
-
-          shifts.forEach(
-            shift => {
-
-              if (
-                shift ===
-                'İstirahət'
-              ) {
-                counts[
-                  employee.id
-                ].rest++
-              } else {
-
-                counts[
-                  employee.id
-                ].work++
-
-                if (
-                  counts[
-                    employee.id
-                  ].shifts[
-                    shift
-                  ] !==
-                  undefined
-                ) {
-                  counts[
-                    employee.id
-                  ].shifts[
-                    shift
-                  ]++
-                }
-              }
-            }
-          )
-        }
-      )
-    }
-  )
-
+async function showStatisticsSection() {
   const area =
     document.querySelector('#dashboardArea')
+
+  const now = new Date()
+
+  const year =
+    Number(
+      localStorage.getItem('selectedYear')
+    ) || now.getFullYear()
+
+  const month =
+    Number(
+      localStorage.getItem('selectedMonth')
+    ) || (now.getMonth() + 1)
 
   area.innerHTML = `
     <h2>Statistika</h2>
 
     <p>
-      Əməkdaşların iş günü və növbə statistikası.
+      ${String(month).padStart(2, '0')}.${year}
+      üzrə əməkdaş statistikası
     </p>
 
+    <div id="statisticsContent">
+      Məlumat yüklənir...
+    </div>
+  `
+
+  const {
+    data: schedule,
+    error
+  } = await supabase
+    .from('schedules')
+    .select('*')
+    .eq('year', year)
+    .eq('month', month)
+    .maybeSingle()
+
+  const content =
+    document.querySelector(
+      '#statisticsContent'
+    )
+
+  if (error) {
+    console.error(error)
+
+    content.innerHTML = `
+      <p>Statistika yüklənmədi.</p>
+    `
+
+    return
+  }
+
+  if (!schedule) {
+    content.innerHTML = `
+      <p>
+        Bu ay üçün növbə cədvəli yaradılmayıb.
+      </p>
+    `
+
+    return
+  }
+
+  const employees =
+    schedule.employees || []
+
+  const rows =
+    schedule.employee_rows || {}
+
+  const shifts = [
+    '08:00',
+    '09:00',
+    '10:00',
+    '12:00',
+    '15:00',
+    '18:00',
+    '22:00',
+    '00:00'
+  ]
+
+  const statistics =
+    employees.map(employee => {
+
+      const employeeShifts =
+        rows[employee.id] || []
+
+      const shiftCounts = {}
+
+      shifts.forEach(shift => {
+        shiftCounts[shift] = 0
+      })
+
+      let restDays = 0
+      let workDays = 0
+
+      employeeShifts.forEach(shift => {
+
+        if (
+          !shift ||
+          String(shift)
+            .trim()
+            .toLowerCase() ===
+            'istirahət'
+        ) {
+          restDays++
+          return
+        }
+
+        if (
+          shifts.includes(shift)
+        ) {
+          workDays++
+
+          shiftCounts[shift]++
+        }
+      })
+
+      return {
+        employee,
+        shiftCounts,
+        restDays,
+        workDays
+      }
+    })
+
+  content.innerHTML = `
     <div class="table-wrapper">
 
-      <table>
+      <table class="statistics-table">
 
         <thead>
-
           <tr>
 
             <th>Əməkdaş</th>
-            <th>İş günü</th>
-            <th>İstirahət</th>
 
-            ${SHIFTS.map(
+            ${shifts.map(
               shift => `
-                <th>
-                  ${shift}
-                </th>
+                <th>${shift}</th>
               `
             ).join('')}
 
-          </tr>
+            <th>İş günü</th>
 
+            <th>İstirahət</th>
+
+            <th>Ümumi növbə</th>
+
+          </tr>
         </thead>
 
         <tbody>
 
-          ${
-            employees.length
-              ? employees.map(
-                  employee => `
-                    <tr>
+          ${statistics.map(item => {
 
-                      <td>
-                        ${employee.name}
-                        ${employee.surname}
-                      </td>
+            const employeeName =
+              item.employee.full_name ||
+              item.employee.name ||
+              item.employee.email ||
+              'Adsız əməkdaş'
 
-                      <td>
-                        <strong>
-                          ${
-                            counts[
-                              employee.id
-                            ].work
-                          }
-                        </strong>
-                      </td>
+            return `
+              <tr>
 
-                      <td>
-                        ${
-                          counts[
-                            employee.id
-                          ].rest
-                        }
-                      </td>
+                <td>
+                  <strong>
+                    ${employeeName}
+                  </strong>
+                </td>
 
-                      ${SHIFTS.map(
-                        shift => `
-                          <td>
-                            ${
-                              counts[
-                                employee.id
-                              ].shifts[
-                                shift
-                              ]
-                            }
-                          </td>
-                        `
-                      ).join('')}
-
-                    </tr>
+                ${shifts.map(
+                  shift => `
+                    <td>
+                      ${
+                        item.shiftCounts[
+                          shift
+                        ]
+                      }
+                    </td>
                   `
-                ).join('')
+                ).join('')}
 
-              : `
-                <tr>
-                  <td colspan="11">
-                    Əməkdaş yoxdur.
-                  </td>
-                </tr>
-              `
-          }
+                <td>
+                  <strong>
+                    ${item.workDays}
+                  </strong>
+                </td>
+
+                <td>
+                  ${item.restDays}
+                </td>
+
+                <td>
+                  <strong>
+                    ${item.workDays}
+                  </strong>
+                </td>
+
+              </tr>
+            `
+          }).join('')}
 
         </tbody>
 
