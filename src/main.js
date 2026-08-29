@@ -1993,7 +1993,12 @@ async function showScheduleSection() {
     >
       Avtomatik yarat
     </button>
-    
+    <button
+  id="exportScheduleExcelBtn"
+  type="button"
+>
+  Excel yüklə
+</button>
     <button
       id="recoverScheduleBtn"
       type="button"
@@ -2053,6 +2058,12 @@ async function showScheduleSection() {
       generateScheduleFromForm
     )
     document
+  .querySelector('#exportScheduleExcelBtn')
+  .addEventListener(
+    'click',
+    exportScheduleToExcel
+  )
+    document
     .querySelector('#recoverScheduleBtn')
     .addEventListener(
       'click',
@@ -2081,7 +2092,73 @@ async function showScheduleSection() {
     updateWorkDayInfo()
     await loadSelectedSchedule()
     }
-
+    function exportScheduleToExcel() {
+      const table =
+        document.querySelector(
+          '#scheduleTableArea table'
+        )
+    
+      if (!table) {
+        alert(
+          'Yükləmək üçün əvvəlcə növbə cədvəli yaradın.'
+        )
+        return
+      }
+    
+      const month =
+        Number(
+          document.querySelector(
+            '#scheduleMonth'
+          ).value
+        )
+    
+      const year =
+        Number(
+          document.querySelector(
+            '#scheduleYear'
+          ).value
+        )
+    
+      const clonedTable =
+        table.cloneNode(true)
+    
+      const html = `
+        <html>
+          <head>
+            <meta charset="UTF-8">
+          </head>
+          <body>
+            ${clonedTable.outerHTML}
+          </body>
+        </html>
+      `
+    
+      const blob =
+        new Blob(
+          ['\ufeff', html],
+          {
+            type:
+              'application/vnd.ms-excel;charset=utf-8;'
+          }
+        )
+    
+      const url =
+        URL.createObjectURL(blob)
+    
+      const link =
+        document.createElement('a')
+    
+      link.href = url
+    
+      link.download =
+        `Novbe_Cedveli_${String(month).padStart(2, '0')}_${year}.xls`
+    
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    
+      URL.revokeObjectURL(url)
+    }
 /* =========================
    GENERATE
 ========================= */
