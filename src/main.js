@@ -2243,231 +2243,377 @@ function createAutomaticSchedule(
       month
     )
 
-  const restDayCount =
-    daysInMonth -
-    targetWorkDays
+  const FIXED_SHIFTS = [
+    '08:00',
+    '09:00',
+    '10:00',
+    '22:00',
+    '00:00'
+  ]
 
-  const rows = {}
-  const restDays = {}
+  const FLEX_SHIFTS = [
+    '12:00',
+    '15:00',
+    '18:00'
+  ]
+
+  const ALL_SHIFTS = [
+    ...FIXED_SHIFTS,
+    ...FLEX_SHIFTS
+  ]
+
+  if (!employees.length) {
+    throw new Error(
+      'Əməkdaş siyahısı boşdur.'
+    )
+  }
+
+  const employeeRows = {}
+  const workedCount = {}
   const shiftCounts = {}
 
-  employees.forEach(
-    employee => {
-
-      rows[employee.id] =
-        Array(
-          daysInMonth
-        ).fill(null)
-
-      restDays[employee.id] =
-        new Set()
-
-      shiftCounts[employee.id] = {}
-
-      SHIFTS.forEach(
-        shift => {
-          shiftCounts[
-            employee.id
-          ][shift] = 0
-        }
+  employees.forEach(employee => {
+    employeeRows[employee.id] =
+      Array(daysInMonth).fill(
+        'İstirahət'
       )
+
+    workedCount[employee.id] = 0
+
+    shiftCounts[employee.id] = {}
+
+    ALL_SHIFTS.forEach(shift => {
+      shiftCounts[
+        employee.id
+      ][shift] = 0
+    })
+  })
+
+  /*
+    Ay üzrə ümumi neçə iş növbəsi
+    paylanmalıdır.
+  */
+
+    const minimumAssignments =
+    daysInMonth * 8
+  
+  const baseAssignments =
+    employees.length *
+    targetWorkDays
+  
+  const totalAssignments =
+    Math.max(
+      baseAssignments,
+      minimumAssignments
+    )
+  
+  const employeeTargets = {}
+  
+  const extraAssignments =
+    totalAssignments -
+    baseAssignments
+  
+  const baseExtra =
+    Math.floor(
+      extraAssignments /
+      employees.length
+    )
+  
+  let extraRemainder =
+    extraAssignments %
+    employees.length
+  
+  const randomizedEmployees =
+    [...employees].sort(
+      () => Math.random() - 0.5
+    )
+  
+  randomizedEmployees.forEach(
+    employee => {
+      employeeTargets[employee.id] =
+        targetWorkDays +
+        baseExtra +
+        (
+          extraRemainder > 0
+            ? 1
+            : 0
+        )
+  
+      if (extraRemainder > 0) {
+        extraRemainder--
+      }
     }
   )
 
   /*
-    Hər əməkdaşa ay üzrə
-    lazım olan sayda istirahət veririk.
-
-    İstirahət günləri həftənin
-    istənilən gününə düşə bilər.
+    Hər gün neçə nəfər işləyəcək.
+    Minimum 8 nəfər.
   */
 
-    employees.forEach(employee => {
-      const availableDays =
-        Array.from(
-          { length: daysInMonth },
-          (_, index) => index
-        )
-    
-      // Günləri hər dəfə təsadüfi qarışdır
-      for (
-        let i = availableDays.length - 1;
-        i > 0;
-        i--
-      ) {
-        const j =
-          Math.floor(
-            Math.random() * (i + 1)
-          )
-    
-        ;[
-          availableDays[i],
-          availableDays[j]
-        ] = [
-          availableDays[j],
-          availableDays[i]
-        ]
-      }
-    
-      // Qarışdırılmış günlərdən istirahət günlərini seç
-      availableDays
-        .slice(0, restDayCount)
-        .forEach(day => {
-          restDays[employee.id].add(day)
-        })
-    })
+  const dailyEmployeeCount =
+    Array(daysInMonth).fill(8)
+
+  let remainingAssignments =
+    totalAssignments -
+    minimumAssignments
 
   /*
-    Gün-gün hər əməkdaşın
-    növbəsini seçirik.
+    Əlavə işçiləri günlər arasında
+    təsadüfi paylayırıq.
+  */
+
+  while (
+    remainingAssignments > 0
+  ) {
+    const day =
+      Math.floor(
+        Math.random() *
+        daysInMonth
+      )
+
+    if (
+      dailyEmployeeCount[day] <
+      employees.length
+    ) {
+      dailyEmployeeCount[day]++
+
+      remainingAssignments--
+    }
+  }
+
+  /*
+    Hər gün əməkdaşları seçirik.
   */
 
   for (
-    let day = 0;
-    day < daysInMonth;
-    day++
+    let dayIndex = 0;
+    dayIndex < daysInMonth;
+    dayIndex++
   ) {
+    const remainingDays =
+      daysInMonth -
+      dayIndex
 
-    employees.forEach(
-      (
-        employee,
-        employeeIndex
-      ) => {
+    /*
+      Əməkdaşları qalan iş günü
+      ehtiyacına görə sıralayırıq.
+    */
 
-        /*
-          Planlı istirahət
-        */
+    const candidates =
+      [...employees]
+        .filter(employee =>
+          workedCount[
+            employee.id
+          ] < targetWorkDays
+        )
+        .map(employee => ({
+          employee,
 
+          need:
+            targetWorkDays -
+            workedCount[
+              employee.id
+            ],
+
+          random:
+            Math.random()
+        }))
+        .sort((a, b) => {
+          /*
+            Ayın sonuna yaxın işləməsi
+            vacib olan əməkdaş üstünlük
+            alır.
+          */
+
+          const mustA =
+            a.need >=
+            remainingDays
+              ? 1
+              : 0
+
+          const mustB =
+            b.need >=
+            remainingDays
+              ? 1
+              : 0
+
+          if (mustA !== mustB) {
+            return mustB - mustA
+          }
+
+          if (a.need !== b.need) {
+            return b.need - a.need
+          }
+
+          return (
+            a.random -
+            b.random
+          )
+        })
+
+    const countForToday =
+      Math.min(
+        dailyEmployeeCount[
+          dayIndex
+        ],
+        candidates.length
+      )
+
+    const todayEmployees =
+      candidates
+        .slice(
+          0,
+          countForToday
+        )
+        .map(
+          item =>
+            item.employee
+        )
+
+    /*
+      Əvvəl 08,09,10,22,00
+      növbələrinin hərəsinə
+      DƏQİQ 1 nəfər.
+    */
+
+    const availableToday =
+      [...todayEmployees]
+
+    FIXED_SHIFTS.forEach(
+      shift => {
         if (
-          restDays[
-            employee.id
-          ].has(day)
+          !availableToday.length
         ) {
-          rows[
-            employee.id
-          ][day] =
-            'İstirahət'
-
           return
         }
 
-        let allowedShifts =
-          [...SHIFTS]
-
         /*
-          Qadınlara gecə növbəsi yoxdur
+          Həmin növbəni ay ərzində
+          ən az işləyən əməkdaşı seç.
         */
 
-        if (
-          employee.gender ===
-          'Qadın'
-        ) {
-          allowedShifts =
-            allowedShifts.filter(
-              shift =>
-                shift !== '22:00' &&
-                shift !== '00:00'
-            )
-        }
-
-        const previousShift =
-          day > 0
-            ? rows[
-                employee.id
-              ][day - 1]
-            : null
-
-        /*
-          12 saat qaydasına
-          uyğun növbələr
-        */
-
-        let validShifts =
-          allowedShifts.filter(
-            shift =>
-              has12HourRest(
-                previousShift,
-                shift
-              )
-          )
-
-        /*
-          Əgər 12 saat qaydasına görə
-          seçim çox azalırsa,
-          yalnız uyğun olanlardan istifadə edilir.
-        */
-
-        if (!validShifts.length) {
-          validShifts =
-            ['18:00']
-        }
-
-        /*
-          Əsas balans:
-          həmin növbə kimə ən az
-          düşübsə, ona üstünlük.
-        */
-
-        validShifts.sort(
+        availableToday.sort(
           (a, b) => {
+            const diff =
+              shiftCounts[a.id][
+                shift
+              ] -
+              shiftCounts[b.id][
+                shift
+              ]
 
-            const difference =
-              shiftCounts[
-                employee.id
-              ][a] -
-              shiftCounts[
-                employee.id
-              ][b]
-
-            if (
-              difference !== 0
-            ) {
-              return difference
+            if (diff !== 0) {
+              return diff
             }
 
             return (
-              (
-                SHIFTS.indexOf(a) +
-                employeeIndex +
-                day
-              ) %
-              SHIFTS.length
-            ) -
-            (
-              (
-                SHIFTS.indexOf(b) +
-                employeeIndex +
-                day
-              ) %
-              SHIFTS.length
+              Math.random() -
+              0.5
             )
           }
         )
 
-        const minimum =
-          shiftCounts[
-            employee.id
-          ][validShifts[0]]
+        const employee =
+          availableToday.shift()
 
-        const balanced =
-          validShifts.filter(
-            shift =>
-              shiftCounts[
-                employee.id
-              ][shift] <=
-              minimum + 1
-          )
-
-          const selectedShift =
-          balanced[
-            Math.floor(
-              Math.random() * balanced.length
-            )
-          ]
-
-        rows[
+        employeeRows[
           employee.id
-        ][day] =
+        ][dayIndex] =
+          shift
+
+        shiftCounts[
+          employee.id
+        ][shift]++
+      }
+    )
+
+    /*
+      12,15,18 növbələrinin
+      hərəsinə minimum 1 nəfər.
+    */
+
+    FLEX_SHIFTS.forEach(
+      shift => {
+        if (
+          !availableToday.length
+        ) {
+          return
+        }
+
+        availableToday.sort(
+          (a, b) => {
+            const diff =
+              shiftCounts[a.id][
+                shift
+              ] -
+              shiftCounts[b.id][
+                shift
+              ]
+
+            if (diff !== 0) {
+              return diff
+            }
+
+            return (
+              Math.random() -
+              0.5
+            )
+          }
+        )
+
+        const employee =
+          availableToday.shift()
+
+        employeeRows[
+          employee.id
+        ][dayIndex] =
+          shift
+
+        shiftCounts[
+          employee.id
+        ][shift]++
+      }
+    )
+
+    /*
+      Qalan əməkdaşlar yalnız
+      12,15,18 növbələrinə
+      balanslı paylanır.
+    */
+
+    availableToday.forEach(
+      employee => {
+        const availableShifts =
+          [...FLEX_SHIFTS]
+            .sort(
+              (a, b) => {
+                const diff =
+                  shiftCounts[
+                    employee.id
+                  ][a] -
+                  shiftCounts[
+                    employee.id
+                  ][b]
+
+                if (
+                  diff !== 0
+                ) {
+                  return diff
+                }
+
+                return (
+                  Math.random() -
+                  0.5
+                )
+              }
+            )
+
+        const selectedShift =
+          availableShifts[0]
+
+        employeeRows[
+          employee.id
+        ][dayIndex] =
           selectedShift
 
         shiftCounts[
@@ -2475,43 +2621,56 @@ function createAutomaticSchedule(
         ][selectedShift]++
       }
     )
+
+    /*
+      Bu gün işləyənlərin
+      aylıq sayını artır.
+    */
+
+    todayEmployees.forEach(
+      employee => {
+        workedCount[
+          employee.id
+        ]++
+      }
+    )
   }
 
   /*
     Son yoxlama:
-    hər əməkdaşın işlədiyi
-    gün sayı hədəfə bərabərdir.
+    hər əməkdaş targetWorkDays
+    qədər işləməlidir.
   */
 
-  employees.forEach(
-    employee => {
+  employees.forEach(employee => {
+    const count =
+      employeeRows[
+        employee.id
+      ].filter(
+        shift =>
+          shift !==
+          'İstirahət'
+      ).length
 
-      const worked =
-        rows[
-          employee.id
-        ].filter(
-          shift =>
-            shift !==
-              'İstirahət'
-        ).length
-
-      if (
-        worked !==
+    if (
+      count !== targetWorkDays
+    ) {
+      console.warn(
+        employee.name,
+        'iş günü:',
+        count,
+        'hədəf:',
         targetWorkDays
-      ) {
-        console.warn(
-          `${employee.name}: ${worked}/${targetWorkDays}`
-        )
-      }
+      )
     }
-  )
+  })
 
   return {
     year,
     month,
     daysInMonth,
     targetWorkDays,
-    employeeRows: rows
+    employeeRows
   }
 }
 
