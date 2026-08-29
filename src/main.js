@@ -3763,117 +3763,102 @@ async function showOperatorSchedule() {
     </div>
     `
 
-    document
-    .querySelectorAll('.shift-edit-btn')
-    .forEach(button => {
-  
-      button.addEventListener(
-        'click',
-        event => {
-  
-          const button =
-            event.currentTarget
-  
-          const employeeId =
-            button.dataset.employeeId
-  
-          const dayIndex =
-            Number(
-              button.dataset.dayIndex
-            )
-  
-          const currentShift =
-            button.dataset.currentShift
-  
-          const select =
-            document.createElement('select')
-  
-          select.className =
-            'manual-shift-select'
-  
-          const options = [
-            'İstirahət',
-            '08:00',
-            '09:00',
-            '10:00',
-            '12:00',
-            '15:00',
-            '18:00',
-            '22:00',
-            '00:00'
-          ]
-  
-          select.innerHTML =
-            options
-              .map(option => `
-                <option
-                  value="${option}"
-                  ${
-                    option === currentShift
-                      ? 'selected'
-                      : ''
-                  }
-                >
-                  ${option}
-                </option>
-              `)
-              .join('')
-  
-          button.replaceWith(select)
-  
-          select.focus()
-  
-          select.addEventListener(
-            'change',
-            async () => {
-  
-              const newShift =
-                select.value
-  
-              schedule.employeeRows[
-                employeeId
-              ][dayIndex] =
-                newShift
-  
-              const { error } =
-                await supabase
-                  .from('schedules')
-                  .update({
-                    employee_rows:
-                      schedule.employeeRows
-                  })
-                  .eq(
-                    'year',
-                    schedule.year
-                  )
-                  .eq(
-                    'month',
-                    schedule.month
-                  )
-  
-              if (error) {
-                console.error(error)
-  
-                alert(
-                  'Növbə yadda saxlanmadı.'
-                )
-  
-                renderEmployeeSchedule(
-                  schedule
-                )
-  
-                return
+    area.onclick = async event => {
+      const button =
+        event.target.closest('.shift-edit-btn')
+    
+      if (!button) {
+        return
+      }
+    
+      const employeeId =
+        button.dataset.employeeId
+    
+      const dayIndex =
+        Number(button.dataset.dayIndex)
+    
+      const currentShift =
+        button.dataset.currentShift
+    
+      const select =
+        document.createElement('select')
+    
+      select.className =
+        'manual-shift-select'
+    
+      const options = [
+        'İstirahət',
+        '08:00',
+        '09:00',
+        '10:00',
+        '12:00',
+        '15:00',
+        '18:00',
+        '22:00',
+        '00:00'
+      ]
+    
+      select.innerHTML =
+        options
+          .map(option => `
+            <option
+              value="${option}"
+              ${
+                option === currentShift
+                  ? 'selected'
+                  : ''
               }
-  
-              renderEmployeeSchedule(
-                schedule
+            >
+              ${option}
+            </option>
+          `)
+          .join('')
+    
+      button.replaceWith(select)
+    
+      select.focus()
+    
+      select.addEventListener(
+        'change',
+        async () => {
+          const newShift =
+            select.value
+    
+          schedule.employeeRows[
+            employeeId
+          ][dayIndex] = newShift
+    
+          const { error } =
+            await supabase
+              .from('schedules')
+              .update({
+                employee_rows:
+                  schedule.employeeRows
+              })
+              .eq(
+                'year',
+                schedule.year
               )
-            }
-          )
+              .eq(
+                'month',
+                schedule.month
+              )
+    
+          if (error) {
+            console.error(error)
+    
+            alert(
+              'Növbəni yadda saxlamaq mümkün olmadı.'
+            )
+    
+            renderEmployeeSchedule(schedule)
+            return
+          }
+    
+          renderEmployeeSchedule(schedule)
         }
       )
-    })
-
+    }
 }
 
 
