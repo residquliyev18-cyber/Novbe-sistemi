@@ -2371,50 +2371,128 @@ async function recoverPreviousSchedule() {
     return
   }
 
-  if (!data?.previous_employee_rows) {
-    alert('Geri qaytarılacaq əvvəlki cədvəl yoxdur.')
+  if (!data) {
+    alert('Cədvəl tapılmadı.')
+    return
+  }
+
+  // 1-ci Recover:
+  // Son manual dəyişiklikdən əvvəlki vəziyyəti qaytar
+  if (data.manual_previous_employee_rows) {
+    const {
+      data: recoveredManual,
+      error: manualError
+    } =
+      await supabase
+        .from('schedules')
+        .update({
+          employee_rows:
+            data.manual_previous_employee_rows,
+
+          manual_previous_employee_rows:
+            null
+        })
+        .eq('id', data.id)
+        .select()
+        .single()
+
+    if (manualError) {
+      console.error(manualError)
+
+      alert(
+        'Manual dəyişiklik geri qaytarılmadı.'
+      )
+
+      return
+    }
+
+    const schedule = {
+      year:
+        recoveredManual.year,
+
+      month:
+        recoveredManual.month,
+
+      daysInMonth:
+        new Date(
+          recoveredManual.year,
+          recoveredManual.month,
+          0
+        ).getDate(),
+
+      targetWorkDays:
+        recoveredManual.target_work_days,
+
+      employeeRows:
+        recoveredManual.employee_rows || {}
+    }
+
+    renderEmployeeSchedule(schedule)
+
+    alert(
+      'Son manual növbə dəyişikliyi geri qaytarıldı.'
+    )
+
+    return
+  }
+
+  // 2-ci Recover:
+  // Əvvəlki ümumi cədvəli qaytar
+  if (!data.previous_employee_rows) {
+    alert(
+      'Geri qaytarılacaq əvvəlki cədvəl yoxdur.'
+    )
+
     return
   }
 
   const {
     data: recovered,
     error: recoverError
-  } = await supabase
-    .from('schedules')
-    .update({
-      employee_rows:
-        data.previous_employee_rows,
+  } =
+    await supabase
+      .from('schedules')
+      .update({
+        employee_rows:
+          data.previous_employee_rows,
 
-      employees:
-        data.previous_employees ||
-        data.employees,
+        employees:
+          data.previous_employees ||
+          data.employees,
 
-      target_work_days:
-        data.previous_target_work_days ||
-        data.target_work_days,
+        target_work_days:
+          data.previous_target_work_days ||
+          data.target_work_days,
 
-      previous_employee_rows:
-        data.employee_rows,
+        previous_employee_rows:
+          data.employee_rows,
 
-      previous_employees:
-        data.employees,
+        previous_employees:
+          data.employees,
 
-      previous_target_work_days:
-        data.target_work_days
-    })
-    .eq('id', data.id)
-    .select()
-    .single()
+        previous_target_work_days:
+          data.target_work_days
+      })
+      .eq('id', data.id)
+      .select()
+      .single()
 
   if (recoverError) {
     console.error(recoverError)
-    alert('Əvvəlki cədvəl bərpa edilmədi.')
+
+    alert(
+      'Əvvəlki cədvəl bərpa edilmədi.'
+    )
+
     return
   }
 
   const schedule = {
-    year: recovered.year,
-    month: recovered.month,
+    year:
+      recovered.year,
+
+    month:
+      recovered.month,
 
     daysInMonth:
       new Date(
@@ -2427,12 +2505,14 @@ async function recoverPreviousSchedule() {
       recovered.target_work_days,
 
     employeeRows:
-      recovered.employee_rows
+      recovered.employee_rows || {}
   }
 
   renderEmployeeSchedule(schedule)
 
-  alert('Əvvəlki cədvəl bərpa edildi.')
+  alert(
+    'Əvvəlki ümumi cədvəl bərpa edildi.'
+  )
 }
 /* =========================
    AVTOMATİK NÖVBƏ
@@ -3266,18 +3346,28 @@ function renderEmployeeSchedule(schedule) {
           optionEvent.stopPropagation()
 
           const oldShift =
-            schedule.employeeRows[
-              employeeId
-            ][dayIndex]
-
           schedule.employeeRows[
             employeeId
-          ][dayIndex] = option
+          ][dayIndex]
+        
+        const beforeManualChange =
+          JSON.parse(
+            JSON.stringify(
+              schedule.employeeRows
+            )
+          )
+        
+        schedule.employeeRows[
+          employeeId
+        ][dayIndex] = option
 
           const { error } =
             await supabase
               .from('schedules')
               .update({
+                manual_previous_employee_rows:
+                  beforeManualChange,
+              
                 employee_rows:
                   schedule.employeeRows
               })
