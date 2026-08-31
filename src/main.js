@@ -1002,7 +1002,9 @@ async function showAdminDashboard() {
   
           if (
             !shift ||
-            shift.trim().toLowerCase() === 'istirahət'
+            !SHIFTS.includes(
+              String(shift).trim()
+            )
           ) {
             return
           }
@@ -2732,7 +2734,15 @@ function createAutomaticSchedule(
 
     const availableToday =
       [...todayEmployees]
-
+      const isShiftAllowed = (
+        employee,
+        shift
+      ) => {
+        const forbiddenShifts =
+          employee.forbiddenShifts || []
+      
+        return !forbiddenShifts.includes(shift)
+      }
     FIXED_SHIFTS.forEach(
       shift => {
         if (
@@ -2745,8 +2755,22 @@ function createAutomaticSchedule(
           Həmin növbəni ay ərzində
           ən az işləyən əməkdaşı seç.
         */
-
-        availableToday.sort(
+          const eligibleEmployees =
+          availableToday.filter(
+            employee => {
+              const forbiddenShifts =
+                employee.forbiddenShifts || []
+        
+              return !forbiddenShifts.includes(
+                shift
+              )
+            }
+          )
+        
+        if (!eligibleEmployees.length) {
+          return
+        }
+        eligibleEmployees.sort(
           (a, b) => {
             const diff =
               shiftCounts[a.id][
@@ -2768,7 +2792,20 @@ function createAutomaticSchedule(
         )
 
         const employee =
-          availableToday.shift()
+        eligibleEmployees[0]
+      
+      const employeeIndex =
+        availableToday.findIndex(
+          item =>
+            item.id === employee.id
+        )
+      
+      if (employeeIndex !== -1) {
+        availableToday.splice(
+          employeeIndex,
+          1
+        )
+      }
 
         employeeRows[
           employee.id
