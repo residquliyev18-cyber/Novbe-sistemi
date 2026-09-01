@@ -2823,80 +2823,92 @@ function createAutomaticSchedule(
       
         return !forbiddenShifts.includes(shift)
       }
-    FIXED_SHIFTS.forEach(
-      shift => {
-        if (
-          !availableToday.length
-        ) {
+      const fixedShiftPriority = [
+        '00:00',
+        '22:00',
+        '08:00',
+        '09:00',
+        '10:00'
+      ]
+      
+      fixedShiftPriority.forEach(shift => {
+        if (!availableToday.length) {
           return
         }
-
-        /*
-          Həmin növbəni ay ərzində
-          ən az işləyən əməkdaşı seç.
-        */
-          const eligibleEmployees =
-          availableToday.filter(
-            employee => {
-              const forbiddenShifts =
-                employee.forbiddenShifts || []
-        
-              return !forbiddenShifts.includes(
+      
+        const eligibleEmployees =
+          availableToday.filter(employee => {
+            const forbiddenShifts =
+              employee.forbiddenShifts || []
+      
+            if (
+              forbiddenShifts.includes(shift)
+            ) {
+              return false
+            }
+      
+            const previousShift =
+              dayIndex > 0
+                ? employeeRows[
+                    employee.id
+                  ][dayIndex - 1]
+                : null
+      
+            if (
+              !has12HourRest(
+                previousShift,
                 shift
               )
+            ) {
+              return false
             }
-          )
-        
+      
+            return true
+          })
+      
         if (!eligibleEmployees.length) {
+          console.warn(
+            `${dayIndex + 1}-ci gün ${shift} üçün uyğun əməkdaş tapılmadı.`
+          )
           return
         }
-        eligibleEmployees.sort(
-          (a, b) => {
-            const diff =
-              shiftCounts[a.id][
-                shift
-              ] -
-              shiftCounts[b.id][
-                shift
-              ]
-
-            if (diff !== 0) {
-              return diff
-            }
-
-            return (
-              Math.random() -
-              0.5
-            )
+      
+        eligibleEmployees.sort((a, b) => {
+          const diff =
+            shiftCounts[a.id][shift] -
+            shiftCounts[b.id][shift]
+      
+          if (diff !== 0) {
+            return diff
           }
-        )
-
+      
+          return Math.random() - 0.5
+        })
+      
         const employee =
-        eligibleEmployees[0]
+          eligibleEmployees[0]
       
-      const employeeIndex =
-        availableToday.findIndex(
-          item =>
-            item.id === employee.id
-        )
-      
-      if (employeeIndex !== -1) {
-        availableToday.splice(
-          employeeIndex,
-          1
-        )
-      }
-
         employeeRows[
           employee.id
-        ][dayIndex] =
-          shift
-
+        ][dayIndex] = shift
+      
         shiftCounts[
           employee.id
         ][shift]++
-      }
-    )
+      
+        const employeeIndex =
+          availableToday.findIndex(
+            item =>
+              item.id === employee.id
+          )
+      
+        if (employeeIndex !== -1) {
+          availableToday.splice(
+            employeeIndex,
+            1
+          )
+        }
+      })
 
     /*
       12,15,18 növbələrinin
