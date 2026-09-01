@@ -2945,7 +2945,58 @@ function createAutomaticSchedule(
         ][shift]++
       }
     )
-
+    FLEX_SHIFTS.forEach(shift => {
+      if (!availableToday.length) {
+        return
+      }
+    
+      const eligibleEmployees =
+        availableToday.filter(employee => {
+          const forbiddenShifts =
+            employee.forbiddenShifts || []
+    
+          return !forbiddenShifts.includes(shift)
+        })
+    
+      if (!eligibleEmployees.length) {
+        return
+      }
+    
+      eligibleEmployees.sort((a, b) => {
+        const diff =
+          shiftCounts[a.id][shift] -
+          shiftCounts[b.id][shift]
+    
+        if (diff !== 0) {
+          return diff
+        }
+    
+        return Math.random() - 0.5
+      })
+    
+      const employee =
+        eligibleEmployees[0]
+    
+      const employeeIndex =
+        availableToday.findIndex(
+          item => item.id === employee.id
+        )
+    
+      if (employeeIndex !== -1) {
+        availableToday.splice(
+          employeeIndex,
+          1
+        )
+      }
+    
+      employeeRows[
+        employee.id
+      ][dayIndex] = shift
+    
+      shiftCounts[
+        employee.id
+      ][shift]++
+    })
     /*
       Qalan əməkdaşlar yalnız
       12,15,18 növbələrinə
