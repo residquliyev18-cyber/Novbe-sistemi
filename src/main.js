@@ -792,7 +792,12 @@ async function showAdminDashboard() {
         >
           Statistika
         </button>
-
+        <button
+        id="overtimeBtn"
+        class="menu-btn"
+      >
+        Overtime
+      </button>
         <button
           id="logoutBtn"
           class="menu-btn logout"
@@ -1217,7 +1222,15 @@ if (shift === '00:00') {
       'click',
       showStatisticsSection
     )
-
+    document
+    .querySelector('#overtimeBtn')
+    .addEventListener(
+      'click',
+      () => {
+        activateAdminMenu('overtimeBtn')
+        showOvertimeSection()
+      }
+    )
   document
     .querySelector('#logoutBtn')
     .addEventListener(
@@ -3697,7 +3710,466 @@ async function showStatisticsSection() {
     </div>
   `
 }
+async function showOvertimeSection() {
+  const area =
+    document.querySelector('#dashboardArea')
 
+  const now = new Date()
+
+  const currentMonth =
+    now.getMonth() + 1
+
+  const currentYear =
+    now.getFullYear()
+
+  area.innerHTML = `
+    <h2>Overtime</h2>
+
+    <div
+      style="
+        display:flex;
+        gap:12px;
+        align-items:end;
+        flex-wrap:wrap;
+        margin-bottom:20px;
+      "
+    >
+      <div>
+        <label>Ay</label>
+        <select id="overtimeMonth">
+          ${Array.from(
+            { length: 12 },
+            (_, index) => {
+              const month = index + 1
+
+              return `
+                <option
+                  value="${month}"
+                  ${
+                    month === currentMonth
+                      ? 'selected'
+                      : ''
+                  }
+                >
+                  ${String(month).padStart(2, '0')}
+                </option>
+              `
+            }
+          ).join('')}
+        </select>
+      </div>
+
+      <div>
+        <label>İl</label>
+        <select id="overtimeYear">
+          ${[
+            currentYear - 1,
+            currentYear,
+            currentYear + 1
+          ].map(year => `
+            <option
+              value="${year}"
+              ${
+                year === currentYear
+                  ? 'selected'
+                  : ''
+              }
+            >
+              ${year}
+            </option>
+          `).join('')}
+        </select>
+      </div>
+
+      <button
+        id="loadOvertimeBtn"
+        type="button"
+      >
+        Göstər
+      </button>
+    </div>
+
+    <div id="overtimeTableArea">
+      Overtime məlumatları yüklənir...
+    </div>
+  `
+
+  document
+    .querySelector('#loadOvertimeBtn')
+    .addEventListener(
+      'click',
+      loadOvertimeData
+    )
+
+  await loadOvertimeData()
+}
+
+async function loadOvertimeData() {
+  const tableArea =
+    document.querySelector(
+      '#overtimeTableArea'
+    )
+
+  if (!tableArea) {
+    return
+  }
+
+  const month =
+    Number(
+      document
+        .querySelector('#overtimeMonth')
+        .value
+    )
+
+  const year =
+    Number(
+      document
+        .querySelector('#overtimeYear')
+        .value
+    )
+
+  const { data, error } =
+    await supabase
+      .from('schedules')
+      .select('*')
+      .eq('year', year)
+      .eq('month', month)
+      .maybeSingle()
+
+    
+    const {
+      data: overtimeData,
+      error: overtimeError
+    } =
+      await supabase
+        .from('overtime')
+        .select('*')
+        .eq('year', year)
+        .eq('month', month)
+    
+    if (overtimeError) {
+      console.error(
+        'Overtime xətası:',
+        overtimeError
+      )
+    }
+    
+    if (error) {
+      console.error(
+        'Schedule xətası:',
+        error
+      )
+    
+      tableArea.innerHTML =
+        'Overtime məlumatları yüklənmədi.'
+    
+      return
+    }
+  if (error) {
+    console.error(error)
+
+    tableArea.innerHTML =
+      'Overtime məlumatları yüklənmədi.'
+
+    return
+  }
+
+  if (!data) {
+    tableArea.innerHTML =
+      'Bu ay üçün növbə cədvəli yoxdur.'
+
+    return
+  }
+
+  const employees =
+    data.employees || []
+
+  const employeeRows =
+    data.employee_rows || {}
+
+  const targetWorkDays =
+    Number(data.target_work_days) || 0
+
+  const overtimeRows =
+    employees.map(employee => {
+      const shifts =
+        employeeRows[employee.id] || []
+
+      const workDays =
+        shifts.filter(shift =>
+          [
+            '08:00',
+            '09:00',
+            '10:00',
+            '12:00',
+            '15:00',
+            '18:00',
+            '22:00',
+            '00:00'
+          ].includes(shift)
+        ).length
+
+      const extraDays =
+        Math.max(
+          0,
+          workDays - targetWorkDays
+        )
+
+      const dayOvertime =
+        extraDays * 8
+
+      const eveningOvertime =
+        shifts.filter(
+          shift => shift === '15:00'
+        ).length * 2
+
+      const nightOvertime =
+        shifts.filter(
+          shift =>
+            shift === '18:00' ||
+            shift === '22:00' ||
+            shift === '00:00'
+        ).length * 8
+
+      const employeeName =
+        [
+          employee.name,
+          employee.surname
+        ]
+          .filter(Boolean)
+          .join(' ') ||
+        employee.full_name ||
+        employee.email ||
+        '-'
+        const savedOvertime =
+        overtimeData?.find(
+          item =>
+            String(item.employee_id) ===
+            String(employee.id)
+        )
+      
+      const manualOvertime =
+        Number(
+          savedOvertime?.manual_hours
+        ) || 0
+        return {
+          employeeId: employee.id,
+          employeeName,
+          workDays,
+          extraDays,
+          dayOvertime,
+          eveningOvertime,
+          nightOvertime,
+          manualOvertime
+        }
+    })
+
+  tableArea.innerHTML = `
+    <div class="table-wrapper">
+      <table class="employee-schedule-table">
+        <thead>
+          <tr>
+            <th>Əməkdaş</th>
+            <th>İş günü</th>
+            <th>Aylıq norma</th>
+            <th>Əlavə gün</th>
+            <th>Gün OT</th>
+            <th>Axşam OT</th>
+            <th>Gecə OT</th>
+            <th>Manual OT</th>
+<th>Ümumi OT</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${overtimeRows.map(item => `
+            <tr>
+              <td>
+                <strong>
+                  ${item.employeeName}
+                </strong>
+              </td>
+
+              <td>${item.workDays}</td>
+              <td>${targetWorkDays}</td>
+              <td>${item.extraDays}</td>
+              <td>${item.dayOvertime} saat</td>
+              <td>${item.eveningOvertime} saat</td>
+              <td>${item.nightOvertime} saat</td>
+              <td>
+  <button
+    type="button"
+    class="manual-ot-minus"
+    data-id="${item.employeeId}"
+  >
+    -
+  </button>
+
+  <span id="manualOt-${item.employeeId}">
+  ${item.manualOvertime}
+  </span>
+
+  <button
+    type="button"
+    class="manual-ot-plus"
+    data-id="${item.employeeId}"
+  >
+    +
+  </button>
+</td>
+
+<td>
+  <strong id="totalOt-${item.employeeId}">
+    ${
+      item.dayOvertime +
+      item.eveningOvertime +
+      item.nightOvertime +
+      item.manualOvertime
+    } saat
+  </strong>
+</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `
+  document
+  .querySelectorAll('.manual-ot-plus')
+  .forEach(button => {
+    button.addEventListener(
+      'click',
+      async () => {
+        const id = button.dataset.id
+
+        const manualElement =
+          document.querySelector(
+            `#manualOt-${id}`
+          )
+
+        const totalElement =
+          document.querySelector(
+            `#totalOt-${id}`
+          )
+
+        let manual =
+          Number(manualElement.textContent) || 0
+
+        manual++
+
+        manualElement.textContent = manual
+
+        const item =
+          overtimeRows.find(
+            row =>
+              String(row.employeeId) ===
+              String(id)
+          )
+
+        if (!item) {
+          return
+        }
+
+        const total =
+          item.dayOvertime +
+          item.eveningOvertime +
+          item.nightOvertime +
+          manual
+
+        totalElement.textContent =
+          `${total} saat`
+      }
+    )
+  })
+
+document
+document
+  .querySelectorAll('.manual-ot-minus')
+  .forEach(button => {
+    button.addEventListener(
+      'click',
+      async () => {
+        const id =
+          button.dataset.id
+
+        const manualElement =
+          document.querySelector(
+            `#manualOt-${id}`
+          )
+
+        const totalElement =
+          document.querySelector(
+            `#totalOt-${id}`
+          )
+
+        let manual =
+          Number(
+            manualElement.textContent
+          ) || 0
+
+        if (manual > 0) {
+          manual--
+        }
+
+        manualElement.textContent =
+          manual
+
+        const { error: saveError } =
+          await supabase
+            .from('overtime')
+            .upsert(
+              {
+                employee_id:
+                  String(id),
+                year,
+                month,
+                manual_hours:
+                  manual,
+                updated_at:
+                  new Date().toISOString()
+              },
+              {
+                onConflict:
+                  'employee_id,year,month'
+              }
+            )
+
+        if (saveError) {
+          console.error(
+            'Manual OT yadda saxlanmadı:',
+            saveError
+          )
+
+          alert(
+            'Manual OT yadda saxlanmadı.'
+          )
+
+          return
+        }
+
+        const item =
+          overtimeRows.find(
+            row =>
+              String(row.employeeId) ===
+              String(id)
+          )
+
+        if (!item) {
+          return
+        }
+
+        const total =
+          item.dayOvertime +
+          item.eveningOvertime +
+          item.nightOvertime +
+          manual
+
+        totalElement.textContent =
+          `${total} saat`
+      }
+    )
+  })
+}
 /* =========================
    OPERATOR
 ========================= */
